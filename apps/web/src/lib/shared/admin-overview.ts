@@ -3,38 +3,40 @@
  *
  * Labels and hrefs are derived from real columns:
  *   conversations.waitingSince, conversations.priority, post_statuses.{name,slug,category,isDefault},
- *   changelog_entries.publishedAt, kb_articles.publishedAt, post_activity.type + metadata.toName.
+ *   changelog_entries.publishedAt, kb_articles.publishedAt.
  * Do not invent status names such as "Unreviewed" or "Ready to announce".
+ *
+ * Labels match the admin modules (Support, Feedback, Changelog, Help Center).
+ * The page is workspace-wide. Personal relevance is expressed by ordering
+ * (`mine` first within a kind) and the owner avatar, not by a scope filter.
  */
 import { priorityMeta } from '@/lib/shared/conversation/priority-meta'
 import type { ConversationPriority } from '@/lib/shared/conversation/types'
-import type { ActivityType } from '@/lib/shared/types/activity'
 import { getInitials } from '@/lib/shared/utils'
 
-export type OverviewScope = 'team' | 'mine'
+export type AdminEntity = 'conversation' | 'post' | 'changelog' | 'article'
 
-export type OverviewAttentionKind = 'support' | 'feedback' | 'publishing'
+export type OverviewAttentionKind = 'support' | 'feedback'
 
 export type OverviewReasonTone = 'urgent' | 'neutral' | 'info' | 'success'
 
 export type OverviewAttentionItem = {
   id: string
   kind: OverviewAttentionKind
+  entity: AdminEntity
   title: string
   link: OverviewLink
-  /** Displayed pill — a real priority label, "Unassigned", "Waiting on reply", or a post status name. */
+  /** Displayed dot + label — a real priority label, "Unassigned", "Waiting on reply", or a post status name. */
   reason: string
   reasonTone: OverviewReasonTone
   /** Status or priority hex, when the reason maps to a real colored field. */
   reasonColor?: string | null
+  /** At most two facts, e.g. "Feature Requests · 9d". */
   meta: string
   ownerName: string | null
   ownerInitials: string | null
-  voteCount?: number
-  boardName?: string | null
-  createdAt?: string | null
-  visitorName?: string | null
-  waitingSince?: string | null
+  /** Assigned to or owned by the viewer. */
+  mine: boolean
 }
 
 export type OverviewLink = {
@@ -44,85 +46,72 @@ export type OverviewLink = {
 }
 
 export type OverviewMetric = {
-  key: 'waiting' | 'feedback' | 'complete' | 'articles'
+  key: 'waiting' | 'feedback' | 'complete' | 'helpCenter'
+  /** The items, e.g. "feedback posts". */
   label: string
+  /** The state of those items, e.g. "with no changelog". */
+  detail: string
   count: number
-  unit: string
-  hint: string
-  hintTone: 'urgent' | 'neutral'
   link: OverviewLink
-  filter: OverviewAttentionKind | 'articles'
+  filter: OverviewAttentionKind | 'helpCenter'
 }
 
 type OverviewMetricsInput = {
-  scope: OverviewScope
-  support?: {
-    waitingCount: number
-    highPriorityCount: number
-    waitingLink: OverviewLink
-  }
+  support?: { waitingCount: number; waitingLink: OverviewLink }
   feedback?: {
     reviewCount: number
     completeCount: number
     reviewLink: OverviewLink | null
     completeLink: OverviewLink | null
   }
-  help?: {
-    draftCount: number
-    draftLink: OverviewLink
-  }
+  help?: { draftCount: number; draftLink: OverviewLink }
 }
 
-/** Labels and units stay short enough for a 2-up phone grid. Skip hints that restate the label. */
+/** Count on the left, item + state on the right. No units or invented status names. */
 export function buildOverviewMetrics(input: OverviewMetricsInput): OverviewMetric[] {
   const metrics: OverviewMetric[] = []
   if (input.support) {
-    const high = input.support.highPriorityCount
+    const n = input.support.waitingCount
     metrics.push({
       key: 'waiting',
-      label: 'Waiting for reply',
-      count: input.support.waitingCount,
-      unit: 'open',
-      hint: high > 0 ? `${high} high priority` : '',
-      hintTone: high > 0 ? 'urgent' : 'neutral',
+      label: n === 1 ? 'conversation' : 'conversations',
+      detail: 'waiting for reply',
+      count: n,
       link: input.support.waitingLink,
       filter: 'support',
     })
   }
   if (input.feedback?.reviewLink) {
+    const n = input.feedback.reviewCount
     metrics.push({
       key: 'feedback',
-      label: 'Feedback to review',
-      count: input.feedback.reviewCount,
-      unit: 'open',
-      hint: '',
-      hintTone: 'neutral',
+      label: n === 1 ? 'feedback post' : 'feedback posts',
+      detail: 'to review',
+      count: n,
       link: input.feedback.reviewLink,
       filter: 'feedback',
     })
   }
   if (input.feedback?.completeLink) {
+    const n = input.feedback.completeCount
     metrics.push({
       key: 'complete',
-      label: 'No changelog',
-      count: input.feedback.completeCount,
-      unit: 'open',
-      hint: '',
-      hintTone: 'neutral',
+      label: n === 1 ? 'feedback post' : 'feedback posts',
+      detail: 'with no changelog',
+      count: n,
       link: input.feedback.completeLink,
-      filter: 'publishing',
+      filter: 'feedback',
     })
   }
   if (input.help) {
+    const n = input.help.draftCount
     metrics.push({
-      key: 'articles',
-      label: input.scope === 'mine' ? 'Your drafts' : 'Article drafts',
-      count: input.help.draftCount,
-      unit: 'drafts',
-      hint: '',
-      hintTone: 'neutral',
+      key: 'helpCenter',
+      label: n === 1 ? 'help center article' : 'help center articles',
+      detail: 'in draft',
+      count: n,
       link: input.help.draftLink,
-      filter: 'articles',
+      filter: 'helpCenter',
     })
   }
   return metrics
@@ -138,34 +127,23 @@ export function overviewMetricGridClass(count: number): string {
 
 export type OverviewMomentumItem = {
   postId: string
+  entity: 'post'
   title: string
-  boardName: string
-  statusName: string
-  statusColor?: string | null
-  voteCount: number
   votesLast7d: number
   link: OverviewLink
 }
 
-export type OverviewPublishStatus = 'draft' | 'scheduled' | 'published'
+export type OverviewPublishStatus = 'draft' | 'scheduled'
 
 export type OverviewPublishItem = {
   id: string
   product: 'changelog' | 'helpCenter'
+  entity: 'changelog' | 'article'
   title: string
   link: OverviewLink
   status: OverviewPublishStatus
+  /** Author name, or the scheduled time for scheduled changelogs. */
   meta: string
-}
-
-export type OverviewActivityItem = {
-  id: string
-  actorName: string | null
-  actorInitials: string | null
-  event: string
-  title: string
-  link: OverviewLink
-  at: string
 }
 
 export type OverviewSectionState = {
@@ -174,16 +152,11 @@ export type OverviewSectionState = {
 }
 
 export type AdminOverviewData = {
-  generatedAt: string
-  scope: OverviewScope
   metrics: OverviewMetric[]
   attention: OverviewAttentionItem[]
   momentum: OverviewMomentumItem[]
-  publishing: {
-    changelog: OverviewPublishItem[]
-    helpCenter: OverviewPublishItem[]
-  }
-  activity: OverviewActivityItem[]
+  changelog: OverviewPublishItem[]
+  helpCenter: OverviewPublishItem[]
   sections: {
     support: OverviewSectionState
     feedback: OverviewSectionState
@@ -198,7 +171,7 @@ export function ownerInitials(name: string | null | undefined): string | null {
   return value === '?' ? null : value
 }
 
-/** Compact age for waitingSince / lastMessageAt / generatedAt. */
+/** Compact age for waitingSince / createdAt / publishedAt. */
 export function formatCompactAge(fromIso: string, now = Date.now()): string {
   const ms = now - new Date(fromIso).getTime()
   if (!Number.isFinite(ms)) return ''
@@ -223,7 +196,7 @@ export function conversationTitle(subject: string | null, preview: string | null
 }
 
 /**
- * Pill for a waiting conversation. Priority is the real enum; Unassigned is
+ * Reason for a waiting conversation. Priority is the real enum; Unassigned is
  * assignedAgentPrincipalId IS NULL; otherwise the row is in the queue because
  * waitingSince IS NOT NULL.
  */
@@ -238,24 +211,25 @@ export function supportAttentionReason(input: {
   return { reason: 'Waiting on reply', tone: 'neutral' }
 }
 
+/**
+ * Urgency still leads; after that the viewer's own conversations, then the
+ * unassigned ones nobody has picked up, then the rest of the team's queue.
+ */
 export function supportAttentionRank(input: {
   priority: ConversationPriority
   assigned: boolean
-  waitingSince: string | null
+  mine: boolean
 }): number {
   if (input.priority === 'urgent') return 0
   if (input.priority === 'high') return 1
-  if (!input.assigned) return 2
-  return 3
+  if (input.mine) return 2
+  if (!input.assigned) return 3
+  return 4
 }
 
-export function sortAttention(items: OverviewAttentionItem[]): OverviewAttentionItem[] {
-  const rank: Record<OverviewAttentionKind, number> = {
-    support: 0,
-    feedback: 1,
-    publishing: 2,
-  }
-  return [...items].sort((a, b) => rank[a.kind] - rank[b.kind])
+/** Stable: the viewer's items first, everything else in its existing order. */
+export function viewerFirst<T extends { mine: boolean }>(items: T[]): T[] {
+  return [...items].sort((a, b) => Number(b.mine) - Number(a.mine))
 }
 
 /** Round-robin kinds so one product cannot fill the whole queue. Support still leads. */
@@ -279,56 +253,6 @@ export function mixAttention(
   return mixed
 }
 
-export type OverviewActivitySource =
-  | {
-      source: 'post'
-      type: ActivityType | string
-      actorName: string | null
-      toName?: string | null
-    }
-  | { source: 'changelog'; status: OverviewPublishStatus; actorName: string | null }
-  | { source: 'article'; published: boolean; actorName: string | null }
-  | { source: 'conversation'; actorName: string | null }
-
-function actorLabel(name: string | null): string {
-  return name?.trim() || 'A teammate'
-}
-
-/** Event line from a real activity type / publish state — never a canned name. */
-export function describeOverviewActivity(source: OverviewActivitySource): string {
-  switch (source.source) {
-    case 'post': {
-      const who = actorLabel(source.actorName)
-      if (source.type === 'status.changed' && source.toName) {
-        return `${who} moved feedback to ${source.toName}`
-      }
-      if (source.type === 'post.created') return `${who} created feedback`
-      if (source.type === 'owner.assigned') return `${who} assigned feedback`
-      return `${who} updated feedback`
-    }
-    case 'changelog': {
-      const who = actorLabel(source.actorName)
-      if (source.status === 'scheduled') return `${who} scheduled a changelog`
-      if (source.status === 'published') return `${who} published a changelog`
-      return `${who} edited a changelog`
-    }
-    case 'article': {
-      const who = actorLabel(source.actorName)
-      return source.published ? `${who} published an article` : `${who} edited an article`
-    }
-    case 'conversation':
-      return `${actorLabel(source.actorName)} resolved a conversation`
-  }
-}
-
 export function publishStatusLabel(status: OverviewPublishStatus): string {
-  if (status === 'draft') return 'Draft'
-  if (status === 'scheduled') return 'Scheduled'
-  return 'Published'
-}
-
-export function publishStatusTone(status: OverviewPublishStatus): OverviewReasonTone {
-  if (status === 'scheduled') return 'info'
-  if (status === 'published') return 'success'
-  return 'neutral'
+  return status === 'scheduled' ? 'Scheduled' : 'Draft'
 }

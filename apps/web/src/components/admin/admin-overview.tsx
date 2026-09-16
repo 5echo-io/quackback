@@ -1,29 +1,28 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useRouteContext } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { ChartBarIcon, HomeIcon } from '@heroicons/react/24/solid'
+import { HomeIcon } from '@heroicons/react/24/solid'
 import { adminOverviewQueries } from '@/lib/client/queries/admin-overview'
 import {
   overviewMetricGridClass,
   publishStatusLabel,
-  type OverviewActivityItem,
+  type AdminEntity,
   type OverviewAttentionItem,
   type OverviewAttentionKind,
   type OverviewLink,
   type OverviewMetric,
   type OverviewMomentumItem,
   type OverviewPublishItem,
-  type OverviewScope,
 } from '@/lib/shared/admin-overview'
 import { cn } from '@/lib/shared/utils'
-import { PageHeader } from '@/components/shared/page-header'
+import { EntityIcon } from '@/components/admin/entity-icon'
 import { SettingsCard } from '@/components/admin/settings/settings-card'
+import { PageHeader } from '@/components/shared/page-header'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
-import { TimeAgo } from '@/components/ui/time-ago'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export function useWorkspaceHomeTitle(): string {
   const { settings } = useRouteContext({ from: '__root__' })
@@ -31,19 +30,21 @@ export function useWorkspaceHomeTitle(): string {
   return branding?.name ?? settings?.name ?? 'Home'
 }
 
+type Filter = OverviewAttentionKind | 'all'
+
+/**
+ * One work list, then a card per module on the rail. Counts and the feed are
+ * workspace-wide; the viewer's own items are sorted first server-side.
+ */
 export function OverviewDashboard({
-  scope,
-  onScopeChange,
   actions,
   banner,
 }: {
-  scope: OverviewScope
-  onScopeChange: (scope: OverviewScope) => void
   actions?: ReactNode
   banner?: ReactNode
 }) {
-  const overview = useQuery(adminOverviewQueries.get(scope))
-  const [filter, setFilter] = useState<OverviewAttentionKind | 'all'>('all')
+  const overview = useQuery(adminOverviewQueries.get())
+  const [filter, setFilter] = useState<Filter>('all')
   const data = overview.data
 
   const attention = useMemo(() => {
@@ -53,187 +54,125 @@ export function OverviewDashboard({
   }, [data?.attention, filter])
 
   const filters = useMemo(() => {
-    const kinds: Array<{ id: OverviewAttentionKind | 'all'; label: string }> = [
-      { id: 'all', label: 'All' },
-    ]
+    const kinds: Array<{ id: Filter; label: string }> = [{ id: 'all', label: 'All' }]
     if (data?.sections.support.enabled) kinds.push({ id: 'support', label: 'Support' })
     if (data?.sections.feedback.enabled) kinds.push({ id: 'feedback', label: 'Feedback' })
-    if (data?.sections.feedback.enabled || data?.sections.changelog.enabled) {
-      kinds.push({ id: 'publishing', label: 'Publishing' })
-    }
     return kinds
   }, [data?.sections])
 
+  const momentum = data?.momentum ?? []
+  const changelog = data?.changelog ?? []
+  const helpCenter = data?.helpCenter ?? []
+  const changelogError = data?.sections.changelog.error ?? null
+  const helpError = data?.sections.helpCenter.error ?? null
+  const hasAside =
+    momentum.length > 0 ||
+    changelog.length > 0 ||
+    helpCenter.length > 0 ||
+    Boolean(changelogError) ||
+    Boolean(helpError)
+  const feedError = data?.sections.support.error || data?.sections.feedback.error || null
+
   return (
     <div className="min-w-0 space-y-6">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          className="min-w-0"
-          icon={HomeIcon}
-          title="Overview"
-          size="large"
-          description={
-            scope === 'mine'
-              ? 'Your owned items, with the rest of the workspace as context.'
-              : 'A little context. A clear place to start.'
-          }
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <ScopePills scope={scope} onChange={onScopeChange} />
-          {data?.generatedAt ? (
-            <p className="hidden text-sm text-muted-foreground lg:block">
-              Updated <TimeAgo date={data.generatedAt} />
-            </p>
-          ) : null}
-          {actions}
-        </div>
-      </div>
+      <PageHeader icon={HomeIcon} title="Overview" size="large" action={actions} />
 
       {banner}
 
       {overview.isError ? (
-        <SettingsCard>
-          <p className="text-sm text-muted-foreground">
+        <SettingsCard contentClassName="p-0 sm:p-0">
+          <Quiet>
             Couldn’t load the overview.{' '}
-            <button type="button" className="underline" onClick={() => void overview.refetch()}>
-              Try again
-            </button>
-          </p>
+            <RetryButton onClick={() => void overview.refetch()}>Try again</RetryButton>
+          </Quiet>
         </SettingsCard>
       ) : (
         <>
-          <MetricsRow
+          <CountsCard
             metrics={data?.metrics ?? []}
             loading={overview.isLoading}
             onFilter={(next) => {
-              if (next !== 'articles') setFilter(next)
+              if (next !== 'helpCenter') setFilter(next)
             }}
           />
 
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)]">
-            <div className="space-y-6">
-              <SettingsCard
-                title="Needs attention"
-                description={
-                  scope === 'mine'
-                    ? 'Your owned items, ordered by what needs you first.'
-                    : 'Start with customer replies and time-sensitive work.'
-                }
-                action={
-                  <Badge size="sm" shape="pill" variant="secondary">
-                    {attention.length}
-                  </Badge>
-                }
-                contentClassName="p-0 sm:p-0"
-              >
-                {sectionError(data, ['support', 'feedback']) ? (
-                  <SectionError
-                    message={sectionError(data, ['support', 'feedback'])!}
-                    onRetry={() => void overview.refetch()}
-                  />
-                ) : (
-                  <>
-                    {filters.length > 2 ? (
-                      <div className="flex flex-wrap gap-1 border-b border-border/50 px-4 py-2.5">
-                        {filters.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            aria-pressed={filter === item.id}
-                            onClick={() => setFilter(item.id)}
-                            className={cn(
-                              'rounded-full px-3 py-1.5 text-sm transition-colors',
-                              filter === item.id
-                                ? 'bg-muted text-foreground font-medium'
-                                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                            )}
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    {overview.isLoading ? (
-                      <OverviewSkeleton rows={4} />
-                    ) : attention.length === 0 ? (
-                      <QuietEmpty message="You’re all caught up here." />
-                    ) : (
-                      <div className="divide-y divide-border">
-                        {attention.map((item) => (
-                          <AttentionRow key={item.id} item={item} />
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </SettingsCard>
-
-              <SettingsCard
-                title="Recent activity"
-                description="Updates across your workspace in the last 7 days."
-                contentClassName="p-0 sm:p-0"
-              >
-                {overview.isLoading ? (
-                  <OverviewSkeleton rows={4} />
-                ) : (data?.activity.length ?? 0) === 0 ? (
-                  <QuietEmpty message="No recent workspace activity." />
-                ) : (
-                  <div className="divide-y divide-border">
-                    {data!.activity.map((item) => (
-                      <ActivityRow key={item.id} item={item} />
+          <div
+            className={cn(
+              'grid items-start gap-6',
+              hasAside && 'lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)]'
+            )}
+          >
+            <SettingsCard contentClassName="p-0 sm:p-0">
+              {filters.length > 2 ? (
+                <Tabs
+                  value={filter}
+                  onValueChange={(value) => setFilter(value as Filter)}
+                  variant="line"
+                  className="gap-0 px-4"
+                >
+                  <TabsList className="h-9">
+                    {filters.map((item) => (
+                      <TabsTrigger key={item.id} value={item.id} className="pb-2">
+                        {item.label}
+                      </TabsTrigger>
                     ))}
-                  </div>
-                )}
-              </SettingsCard>
-            </div>
+                  </TabsList>
+                </Tabs>
+              ) : null}
 
-            <div className="space-y-6">
-              <SettingsCard
-                title="Gaining momentum"
-                description="Most new votes in the last 7 days."
-                action={<ChartBarIcon className="size-4 text-muted-foreground" />}
-                contentClassName="p-0 sm:p-0"
-              >
-                {data?.sections.feedback.error ? (
-                  <SectionError
-                    message={data.sections.feedback.error}
-                    onRetry={() => void overview.refetch()}
-                  />
-                ) : overview.isLoading ? (
-                  <OverviewSkeleton rows={3} />
-                ) : (data?.momentum.length ?? 0) === 0 ? (
-                  <QuietEmpty message="No new votes this week." />
-                ) : (
-                  <div className="divide-y divide-border">
-                    {data!.momentum.map((item) => (
-                      <MomentumRow key={item.postId} item={item} />
-                    ))}
-                  </div>
-                )}
-              </SettingsCard>
+              {overview.isLoading ? (
+                <RowsSkeleton rows={5} />
+              ) : (
+                <>
+                  {feedError && attention.length > 0 ? (
+                    <p className="border-b border-border px-3 py-2.5 text-sm text-muted-foreground sm:px-4">
+                      {feedError}{' '}
+                      <RetryButton onClick={() => void overview.refetch()}>Retry</RetryButton>
+                    </p>
+                  ) : null}
+                  {attention.length > 0 ? (
+                    <div className="divide-y divide-border">
+                      {attention.map((item) => (
+                        <AttentionRow key={item.id} item={item} />
+                      ))}
+                    </div>
+                  ) : feedError ? (
+                    <Quiet>
+                      {feedError}{' '}
+                      <RetryButton onClick={() => void overview.refetch()}>Retry</RetryButton>
+                    </Quiet>
+                  ) : (
+                    <Quiet>You’re all caught up.</Quiet>
+                  )}
+                </>
+              )}
+            </SettingsCard>
 
-              <SettingsCard
-                title="On the publishing desk"
-                description="Pick up where your team left off."
-                contentClassName="p-0 sm:p-0"
-              >
-                {data?.sections.changelog.error || data?.sections.helpCenter.error ? (
-                  <SectionError
-                    message={data.sections.changelog.error || data.sections.helpCenter.error || ''}
-                    onRetry={() => void overview.refetch()}
-                  />
-                ) : overview.isLoading ? (
-                  <OverviewSkeleton rows={4} />
-                ) : (
-                  <PublishingDesk
-                    changelog={data?.publishing.changelog ?? []}
-                    helpCenter={data?.publishing.helpCenter ?? []}
-                    changelogOn={Boolean(data?.sections.changelog.enabled)}
-                    helpOn={Boolean(data?.sections.helpCenter.enabled)}
-                  />
-                )}
-              </SettingsCard>
-            </div>
+            {overview.isLoading ? (
+              <Skeleton className="hidden h-40 rounded-xl lg:block" />
+            ) : hasAside ? (
+              <aside className="min-w-0 space-y-6">
+                <ModuleCard title="Feedback" items={momentum}>
+                  {(item) => <MomentumRow key={item.postId} item={item} />}
+                </ModuleCard>
+                <ModuleCard
+                  title="Changelog"
+                  items={changelog}
+                  error={changelogError}
+                  onRetry={() => void overview.refetch()}
+                >
+                  {(item) => <DeskRow key={item.id} item={item} />}
+                </ModuleCard>
+                <ModuleCard
+                  title="Help Center"
+                  items={helpCenter}
+                  error={helpError}
+                  onRetry={() => void overview.refetch()}
+                >
+                  {(item) => <DeskRow key={item.id} item={item} />}
+                </ModuleCard>
+              </aside>
+            ) : null}
           </div>
         </>
       )}
@@ -241,62 +180,16 @@ export function OverviewDashboard({
   )
 }
 
-function ScopePills({
-  scope,
-  onChange,
-}: {
-  scope: OverviewScope
-  onChange: (scope: OverviewScope) => void
-}) {
-  return (
-    <div className="flex items-center" aria-label="Work scope">
-      {(
-        [
-          ['team', 'Team'],
-          ['mine', 'My work'],
-        ] as const
-      ).map(([value, label]) => (
-        <button
-          key={value}
-          type="button"
-          aria-pressed={scope === value}
-          onClick={() => onChange(value)}
-          className={cn(
-            'rounded-full px-3 py-1.5 text-sm transition-colors',
-            scope === value
-              ? 'bg-muted text-foreground font-medium'
-              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function sectionError(
-  data:
-    | { sections: { support: { error: string | null }; feedback: { error: string | null } } }
-    | undefined,
-  keys: Array<'support' | 'feedback'>
-): string | null {
-  if (!data) return null
-  return keys.map((key) => data.sections[key].error).find(Boolean) ?? null
-}
-
-function MetricsRow({
+function CountsCard({
   metrics,
   loading,
   onFilter,
 }: {
   metrics: OverviewMetric[]
   loading: boolean
-  onFilter: (filter: OverviewAttentionKind | 'articles') => void
+  onFilter: (filter: OverviewMetric['filter']) => void
 }) {
-  if (loading) {
-    return <Skeleton className="h-28 w-full rounded-xl" />
-  }
+  if (loading) return <Skeleton className="h-24 w-full rounded-xl" />
   if (metrics.length === 0) return null
   return (
     <Card className="overflow-hidden py-0 gap-0">
@@ -306,27 +199,15 @@ function MetricsRow({
             key={metric.key}
             link={metric.link}
             onClick={() => onFilter(metric.filter)}
-            className="min-w-0 bg-card px-3.5 py-3 text-left transition-colors hover:bg-muted/20 sm:px-5 sm:py-4"
+            className="flex min-w-0 items-center gap-3 bg-card px-3 py-3.5 transition-colors hover:bg-muted/40 sm:gap-4 sm:px-5 sm:py-5"
           >
-            <p className="mb-1.5 truncate text-[11px] font-medium leading-tight text-muted-foreground sm:mb-2 sm:text-xs">
-              {metric.label}
-            </p>
-            <p className="flex flex-wrap items-baseline gap-x-1.5 text-2xl font-bold leading-none tracking-tight tabular-nums sm:text-3xl">
+            <span className="shrink-0 text-3xl font-semibold leading-none tabular-nums tracking-tight sm:text-4xl">
               {metric.count.toLocaleString()}
-              <span className="text-sm font-medium text-muted-foreground sm:text-base">
-                {metric.unit}
-              </span>
-            </p>
-            {metric.hint ? (
-              <p
-                className={cn(
-                  'mt-1.5 truncate text-xs leading-tight',
-                  metric.hintTone === 'urgent' ? 'text-destructive' : 'text-muted-foreground'
-                )}
-              >
-                {metric.hint}
-              </p>
-            ) : null}
+            </span>
+            <span className="min-w-0 text-sm leading-snug text-muted-foreground">
+              <span className="block">{metric.label}</span>
+              <span className="block">{metric.detail}</span>
+            </span>
           </OverviewNavLink>
         ))}
       </div>
@@ -336,6 +217,7 @@ function MetricsRow({
 
 function OverviewEntityRow({
   link,
+  entity,
   title,
   badge,
   badgeColor,
@@ -343,6 +225,7 @@ function OverviewEntityRow({
   trailing,
 }: {
   link: OverviewLink
+  entity: AdminEntity
   title: string
   badge?: string | null
   badgeColor?: string | null
@@ -352,42 +235,42 @@ function OverviewEntityRow({
   return (
     <OverviewNavLink
       link={link}
-      className="flex w-full min-w-0 items-start gap-3 px-3 py-3 text-left hover:bg-muted/40 sm:items-center sm:px-4"
+      className="flex w-full min-w-0 items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/40 sm:px-4"
     >
+      <EntityIcon entity={entity} className="mt-0.5 self-start" />
       <span className="min-w-0 flex-1">
-        <span className="block line-clamp-2 break-words text-sm font-medium">{title}</span>
+        <span className="block break-words text-sm font-medium line-clamp-2 sm:line-clamp-1">
+          {title}
+        </span>
         {badge || meta ? (
-          <span className="mt-0.5 flex min-w-0 items-center gap-2">
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             {badge ? (
-              <StatusBadge name={badge} color={badgeColor} className="shrink-0 text-[11px]" />
+              <StatusBadge name={badge} color={badgeColor} className="shrink-0 text-xs" />
             ) : null}
-            {meta ? (
-              <span className="min-w-0 truncate text-xs text-muted-foreground">{meta}</span>
-            ) : null}
+            {badge && meta ? <span aria-hidden="true">·</span> : null}
+            {meta ? <span className="min-w-0 truncate">{meta}</span> : null}
           </span>
         ) : null}
       </span>
-      {trailing ? (
-        <span className="flex shrink-0 items-center gap-2 pt-0.5 sm:pt-0">{trailing}</span>
-      ) : null}
+      {trailing ? <span className="flex shrink-0 items-center gap-2">{trailing}</span> : null}
     </OverviewNavLink>
   )
-}
-
-function ownerTrailing(name: string | null | undefined) {
-  if (!name) return null
-  return <Avatar name={name} className="hidden size-7 text-[11px] sm:flex" />
 }
 
 function AttentionRow({ item }: { item: OverviewAttentionItem }) {
   return (
     <OverviewEntityRow
       link={item.link}
+      entity={item.entity}
       title={item.title}
       badge={item.reason}
       badgeColor={item.reasonColor}
       meta={item.meta}
-      trailing={ownerTrailing(item.ownerName)}
+      trailing={
+        item.ownerName ? (
+          <Avatar name={item.ownerName} className="hidden size-6 text-[11px] sm:flex" />
+        ) : null
+      }
     />
   )
 }
@@ -396,43 +279,22 @@ function MomentumRow({ item }: { item: OverviewMomentumItem }) {
   return (
     <OverviewEntityRow
       link={item.link}
+      entity={item.entity}
       title={item.title}
-      badge={item.statusName}
-      badgeColor={item.statusColor}
-      meta={`${item.boardName} · ${item.voteCount} votes · +${item.votesLast7d} this week`}
+      trailing={
+        <span className="text-xs font-medium tabular-nums text-muted-foreground">
+          +{item.votesLast7d}
+        </span>
+      }
     />
   )
 }
 
-function PublishingDesk({
-  changelog,
-  helpCenter,
-  changelogOn,
-  helpOn,
-}: {
-  changelog: OverviewPublishItem[]
-  helpCenter: OverviewPublishItem[]
-  changelogOn: boolean
-  helpOn: boolean
-}) {
-  if (!changelogOn && !helpOn) {
-    return <QuietEmpty message="Changelog and Help Center are off." />
-  }
-  if (changelog.length === 0 && helpCenter.length === 0) {
-    return <QuietEmpty message="No drafts or scheduled posts." />
-  }
-  return (
-    <div className="divide-y divide-border">
-      {changelogOn ? changelog.map((item) => <PublishRow key={item.id} item={item} />) : null}
-      {helpOn ? helpCenter.map((item) => <PublishRow key={item.id} item={item} />) : null}
-    </div>
-  )
-}
-
-function PublishRow({ item }: { item: OverviewPublishItem }) {
+function DeskRow({ item }: { item: OverviewPublishItem }) {
   return (
     <OverviewEntityRow
       link={item.link}
+      entity={item.entity}
       title={item.title}
       badge={publishStatusLabel(item.status)}
       meta={item.meta}
@@ -440,42 +302,53 @@ function PublishRow({ item }: { item: OverviewPublishItem }) {
   )
 }
 
-function ActivityRow({ item }: { item: OverviewActivityItem }) {
+function ModuleCard<T>({
+  title,
+  items,
+  error,
+  onRetry,
+  children,
+}: {
+  title: string
+  items: T[]
+  error?: string | null
+  onRetry?: () => void
+  children: (item: T) => ReactNode
+}) {
+  if (error) {
+    return (
+      <SettingsCard title={title} contentClassName="p-0 sm:p-0">
+        <Quiet>
+          {error} {onRetry ? <RetryButton onClick={onRetry}>Retry</RetryButton> : null}
+        </Quiet>
+      </SettingsCard>
+    )
+  }
+  if (items.length === 0) return null
   return (
-    <OverviewEntityRow
-      link={item.link}
-      title={item.title}
-      meta={item.event}
-      trailing={
-        <>
-          <TimeAgo date={item.at} className="hidden text-xs text-muted-foreground sm:block" />
-          {ownerTrailing(item.actorName)}
-        </>
-      }
-    />
+    <SettingsCard title={title} contentClassName="p-0 sm:p-0">
+      <div className="divide-y divide-border">{items.map(children)}</div>
+    </SettingsCard>
   )
 }
 
-function QuietEmpty({ message }: { message: string }) {
-  return <p className="px-4 py-10 text-center text-sm text-muted-foreground">{message}</p>
+function Quiet({ children }: { children: ReactNode }) {
+  return <p className="px-3 py-8 text-center text-sm text-muted-foreground sm:px-4">{children}</p>
 }
 
-function SectionError({ message, onRetry }: { message: string; onRetry: () => void }) {
+function RetryButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
-    <p className="px-4 py-4 text-sm text-muted-foreground">
-      {message}{' '}
-      <button type="button" className="underline" onClick={onRetry}>
-        Retry
-      </button>
-    </p>
+    <button type="button" className="underline" onClick={onClick}>
+      {children}
+    </button>
   )
 }
 
-function OverviewSkeleton({ rows }: { rows: number }) {
+function RowsSkeleton({ rows }: { rows: number }) {
   return (
-    <div className="space-y-3 px-4 py-4">
+    <div className="space-y-3 px-4 py-3">
       {Array.from({ length: rows }).map((_, index) => (
-        <Skeleton key={index} className="h-12 w-full rounded-md" />
+        <Skeleton key={index} className="h-10 w-full rounded-md" />
       ))}
     </div>
   )
