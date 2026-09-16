@@ -42,10 +42,10 @@ export const DEFAULT_LIGHT_BASE: ThemeColorBase = {
   foreground: 'oklch(0.145 0 0)',
   card: 'oklch(1 0 0)',
   muted: 'oklch(0.97 0 0)',
-  mutedForeground: 'oklch(0.556 0 0)',
-  border: 'oklch(0.922 0 0)',
+  mutedForeground: 'oklch(0.45 0 0)',
+  border: 'oklch(0.87 0 0)',
   destructive: 'oklch(0.577 0.245 27)',
-  success: 'oklch(0.696 0.149 163)',
+  success: 'oklch(0.62 0.149 163)',
 }
 
 export const DEFAULT_DARK_BASE: ThemeColorBase = {
@@ -56,9 +56,42 @@ export const DEFAULT_DARK_BASE: ThemeColorBase = {
   muted: 'oklch(0.269 0 0)',
   mutedForeground: 'oklch(0.708 0 0)',
   border: 'oklch(0.269 0 0)',
-  destructive: 'oklch(0.396 0.141 25)',
+  destructive: 'oklch(0.70 0.19 25)',
   success: 'oklch(0.696 0.149 163)',
 }
+
+export type ThemeBaseline = 'legacy' | 'refined'
+
+/**
+ * Unbranded refined-theme baseline. Used only when the Labs experiment is
+ * enabled; unspecified branding keys inherit these instead of the legacy
+ * defaults. Primary gold is unchanged.
+ */
+export const REFINED_LIGHT_BASE: ThemeColorBase = {
+  primary: 'oklch(0.886 0.176 86)',
+  background: '#ffffff',
+  foreground: '#0a0a0a',
+  card: '#ffffff',
+  muted: '#f5f5f5',
+  mutedForeground: '#525252',
+  border: '#d4d4d4',
+  destructive: 'oklch(0.577 0.245 27)',
+  success: 'oklch(0.62 0.149 163)',
+}
+
+export const REFINED_DARK_BASE: ThemeColorBase = {
+  primary: 'oklch(0.886 0.176 86)',
+  background: '#0a0a0a',
+  foreground: '#fafafa',
+  card: '#0a0a0a',
+  muted: '#181818',
+  mutedForeground: '#a1a1a1',
+  border: '#262626',
+  destructive: 'oklch(0.70 0.19 25)',
+  success: 'oklch(0.696 0.149 163)',
+}
+
+const REFINED_DEFAULT_RADIUS = '0.5rem'
 
 /** Every variable a theme may carry. Anything else on the object is derived. */
 const MINIMAL_KEYS = [
@@ -90,14 +123,24 @@ const MINIMAL_KEYS = [
  */
 function resolveMinimal(
   minimal: Partial<MinimalThemeVariables>,
-  mode: 'light' | 'dark'
+  mode: 'light' | 'dark',
+  baseline: ThemeBaseline = 'legacy'
 ): MinimalThemeVariables {
-  const resolved: MinimalThemeVariables = {
-    ...(mode === 'light' ? DEFAULT_LIGHT_BASE : DEFAULT_DARK_BASE),
-  }
+  const base =
+    baseline === 'refined'
+      ? mode === 'light'
+        ? REFINED_LIGHT_BASE
+        : REFINED_DARK_BASE
+      : mode === 'light'
+        ? DEFAULT_LIGHT_BASE
+        : DEFAULT_DARK_BASE
+  const resolved: MinimalThemeVariables = { ...base }
   for (const key of MINIMAL_KEYS) {
     const value = minimal[key]
     if (typeof value === 'string' && value.trim() !== '') resolved[key] = value
+  }
+  if (baseline === 'refined' && !(typeof minimal.radius === 'string' && minimal.radius.trim())) {
+    resolved.radius = REFINED_DEFAULT_RADIUS
   }
   return resolved
 }
@@ -111,6 +154,28 @@ const LIGHT_SHADOWS = {
   shadowLg: '0 10px 15px -3px oklch(0 0 0 / 0.1), 0 4px 6px -4px oklch(0 0 0 / 0.1)',
   shadowXl: '0 20px 25px -5px oklch(0 0 0 / 0.1), 0 8px 10px -6px oklch(0 0 0 / 0.1)',
   shadow2xl: '0 25px 50px -12px oklch(0 0 0 / 0.25)',
+}
+
+const REFINED_LIGHT_SHADOWS = {
+  shadow2xs: '0 0 0 0 transparent',
+  shadowXs: '0 0 0 0 transparent',
+  shadowSm: '0 0 0 1px oklch(0 0 0 / 0.04)',
+  shadow: '0 0 0 1px oklch(0 0 0 / 0.06)',
+  shadowMd: '0 4px 16px oklch(0 0 0 / 0.08)',
+  shadowLg: '0 8px 24px oklch(0 0 0 / 0.1)',
+  shadowXl: '0 12px 32px oklch(0 0 0 / 0.12)',
+  shadow2xl: '0 16px 40px oklch(0 0 0 / 0.16)',
+}
+
+const REFINED_DARK_SHADOWS = {
+  shadow2xs: '0 0 0 0 transparent',
+  shadowXs: '0 0 0 0 transparent',
+  shadowSm: '0 0 0 1px oklch(1 0 0 / 0.06)',
+  shadow: '0 0 0 1px oklch(1 0 0 / 0.08)',
+  shadowMd: '0 8px 24px oklch(0 0 0 / 0.4)',
+  shadowLg: '0 12px 32px oklch(0 0 0 / 0.5)',
+  shadowXl: '0 16px 40px oklch(0 0 0 / 0.55)',
+  shadow2xl: '0 20px 48px oklch(0 0 0 / 0.6)',
 }
 
 const DARK_SHADOWS = {
@@ -146,6 +211,16 @@ export function computeContrastForeground(bgOklch: string): string {
   return parsed.l > 0.6 ? 'oklch(0.145 0 0)' : 'oklch(0.985 0 0)'
 }
 
+/** Gold-as-fill stays bright; on light surfaces, type/icons step down in
+ *  lightness only. Keep chroma/hue so it still reads yellow, not olive. */
+export function computeAccentInk(primary: string, mode: 'light' | 'dark'): string {
+  if (mode === 'dark') return primary
+  const parsed = parseOklch(primary)
+  if (!parsed) return primary
+  if (parsed.l <= 0.75) return primary
+  return formatOklch(0.72, parsed.c, parsed.h)
+}
+
 export function generateChartColors(primary: string): [string, string, string, string, string] {
   const parsed = parseOklch(primary)
   if (!parsed) {
@@ -177,16 +252,26 @@ export function generateChartColors(primary: string): [string, string, string, s
  */
 export function expandTheme(
   partial: Partial<MinimalThemeVariables>,
-  options: { mode: 'light' | 'dark' }
+  options: { mode: 'light' | 'dark'; baseline?: ThemeBaseline }
 ): ThemeVariables {
-  const minimal = resolveMinimal(partial, options.mode)
-  const shadows = options.mode === 'light' ? LIGHT_SHADOWS : DARK_SHADOWS
+  const baseline = options.baseline ?? 'legacy'
+  const minimal = resolveMinimal(partial, options.mode, baseline)
+  const shadows =
+    baseline === 'refined'
+      ? options.mode === 'light'
+        ? REFINED_LIGHT_SHADOWS
+        : REFINED_DARK_SHADOWS
+      : options.mode === 'light'
+        ? LIGHT_SHADOWS
+        : DARK_SHADOWS
   const primaryForeground = computeContrastForeground(minimal.primary)
   const destructiveForeground = computeContrastForeground(minimal.destructive)
+  const accentInk = computeAccentInk(minimal.primary, options.mode)
   const charts = generateChartColors(minimal.primary)
 
   return {
     primary: minimal.primary,
+    accentInk,
     background: minimal.background,
     foreground: minimal.foreground,
     card: minimal.card,

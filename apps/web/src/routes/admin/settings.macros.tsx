@@ -5,6 +5,7 @@ import { DocumentDuplicateIcon } from '@heroicons/react/24/solid'
 import { isProductEnabled } from '@/lib/shared/types/settings'
 import { BackLink } from '@/components/ui/back-link'
 import { PageHeader } from '@/components/shared/page-header'
+import { SettingsCard } from '@/components/admin/settings/settings-card'
 import { MacrosManager } from '@/components/admin/conversation/macros-manager'
 import { UpgradeScreen } from '@/components/admin/upgrade'
 
@@ -32,7 +33,7 @@ function MacrosSettingsPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="lg:hidden">
-        <BackLink to="/admin/settings">Settings</BackLink>
+        <BackLink to="/admin/settings/support">Support</BackLink>
       </div>
       <PageHeader
         icon={DocumentDuplicateIcon}
@@ -45,5 +46,11 @@ function MacrosSettingsPage() {
 }
 
 export function MacrosSettingsBody({ entitled }: { entitled: boolean }) {
-  return entitled ? <MacrosManager /> : <UpgradeScreen entitlement="aiDrafts" />
+  return entitled ? (
+    <SettingsCard>
+      <MacrosManager />
+    </SettingsCard>
+  ) : (
+    <UpgradeScreen entitlement="aiDrafts" />
+  )
 }
