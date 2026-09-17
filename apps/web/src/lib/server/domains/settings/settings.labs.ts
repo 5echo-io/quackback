@@ -13,6 +13,7 @@ import { ForbiddenError, InternalError, NotFoundError, ValidationError } from '@
 import {
   experimentStateMap,
   isRegisteredExperimentId,
+  NEW_WORKSPACE_LAB_DEFAULTS,
   projectVisibleExperiments,
   resolveExperimentState,
   resolveVisualTheme,
@@ -28,6 +29,31 @@ const log = logger.child({ component: 'settings-labs' })
 
 function asWorkspaceId(id: string): WorkspaceId {
   return id as WorkspaceId
+}
+
+type LabsExecutor = Pick<typeof db, 'insert'>
+
+/** Seed Labs defaults for a brand-new settings row. Existing rows are left alone. */
+export async function ensureNewWorkspaceLabs(
+  settingsId: string,
+  executor: LabsExecutor = db
+): Promise<void> {
+  const now = new Date()
+  await executor
+    .insert(workspaceExperiments)
+    .values(
+      NEW_WORKSPACE_LAB_DEFAULTS.map((entry) => ({
+        settingsId: asWorkspaceId(settingsId),
+        experimentId: entry.experimentId,
+        visible: entry.visible,
+        enabled: entry.enabled,
+        createdAt: now,
+        updatedAt: now,
+      }))
+    )
+    .onConflictDoNothing({
+      target: [workspaceExperiments.settingsId, workspaceExperiments.experimentId],
+    })
 }
 
 export type LabsProjection = {

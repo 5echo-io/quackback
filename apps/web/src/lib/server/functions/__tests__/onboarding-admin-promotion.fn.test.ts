@@ -42,6 +42,9 @@ vi.mock('@/lib/server/domains/principals/principal.factory', () => ({
 vi.mock('@/lib/server/domains/settings/settings.helpers', () => ({
   invalidateSettingsCache: hoisted.invalidateSettingsCache,
 }))
+vi.mock('@/lib/server/domains/settings/settings.labs', () => ({
+  ensureNewWorkspaceLabs: vi.fn(async () => {}),
+}))
 vi.mock('@/lib/server/domains/settings', () => ({
   DEFAULT_AUTH_CONFIG: { openSignup: false },
   DEFAULT_PORTAL_CONFIG: {},
@@ -93,9 +96,27 @@ vi.mock('@/lib/server/setup-state', async (importOriginal) => ({
 
 vi.mock('@/lib/server/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/server/db')>()
+  const insert = vi.fn((table: unknown) => ({
+    values: vi.fn((values: Record<string, unknown>) => {
+      if (table === actual.settings) {
+        hoisted.settingsInsert(values)
+        return {
+          returning: vi.fn(async () => [
+            {
+              id: 'workspace_test',
+              name: values.name,
+              slug: values.slug,
+            },
+          ]),
+        }
+      }
+      return Promise.resolve()
+    }),
+  }))
   const tx = {
     execute: hoisted.txExecute,
     query: { principal: { findFirst: hoisted.txPrincipalFindFirst } },
+    insert,
   }
   return {
     ...actual,
@@ -107,23 +128,7 @@ vi.mock('@/lib/server/db', async (importOriginal) => {
         principal: { findFirst: hoisted.principalFindFirst },
         postStatuses: { findFirst: hoisted.postStatusesFindFirst },
       },
-      insert: vi.fn((table: unknown) => ({
-        values: vi.fn((values: Record<string, unknown>) => {
-          if (table === actual.settings) {
-            hoisted.settingsInsert(values)
-            return {
-              returning: vi.fn(async () => [
-                {
-                  id: 'workspace_test',
-                  name: values.name,
-                  slug: values.slug,
-                },
-              ]),
-            }
-          }
-          return Promise.resolve()
-        }),
-      })),
+      insert,
     },
   }
 })
