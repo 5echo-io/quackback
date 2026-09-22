@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, Outlet } from '@tanstack/react-router'
+import { FormattedMessage } from 'react-intl'
 import { fetchUserAvatar } from '@/lib/server/functions/portal'
 import { PortalHeader } from '@/components/public/portal-header'
 import { AuthPopoverProvider } from '@/components/auth/auth-popover-context'
@@ -296,6 +297,30 @@ function PortalLayout() {
           <main className="flex-1 w-full flex flex-col">
             <Outlet />
           </main>
+          {/* Source offer — AGPL-3.0 section 13, and a licence obligation
+              rather than decoration.
+
+              This build is modified: the upstream "Powered by Quackback"
+              referral badge was removed. Section 13 requires a modified
+              version served over a network to PROMINENTLY offer its
+              Corresponding Source to the people using it, so this sits in the
+              portal layout rather than where the badge was. The badge lived in
+              feedback-sidebar.tsx inside `hidden lg:block` — desktop only, and
+              only on the boards page. Here it is on every portal route at
+              every width, which is what "prominently" has to mean.
+
+              Do not remove it without putting the offer somewhere equally
+              visible. */}
+          <footer className="w-full flex justify-center py-3 text-[11px] text-muted-foreground">
+            <a
+              href="https://github.com/5echo-io/quackback"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-foreground transition-colors"
+            >
+              <FormattedMessage id="portal.sourceOffer" defaultMessage="Source" />
+            </a>
+          </footer>
           <AuthDialog authConfig={authConfig} workspaceName={org.name} />
         </div>
       </AuthPopoverProvider>
