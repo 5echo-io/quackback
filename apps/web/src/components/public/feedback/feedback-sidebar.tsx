@@ -9,11 +9,7 @@ interface FeedbackSidebarProps {
   onBoardChange: (board: string | undefined) => void
 }
 
-export function FeedbackSidebar({
-  boards,
-  currentBoard,
-  onBoardChange,
-}: FeedbackSidebarProps) {
+export function FeedbackSidebar({ boards, currentBoard, onBoardChange }: FeedbackSidebarProps) {
   return (
     <aside className="w-64 shrink-0 hidden lg:block">
       <div className="sticky top-24">
