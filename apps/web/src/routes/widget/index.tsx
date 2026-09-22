@@ -161,7 +161,6 @@ function WidgetPage() {
     postsHasMore,
     statuses,
     boards,
-    orgSlug,
     boardPermissions,
     tabs,
     linkPreviews,
