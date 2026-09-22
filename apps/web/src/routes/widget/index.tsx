@@ -361,7 +361,6 @@ function WidgetPage() {
 
   return (
     <WidgetShell
-      orgSlug={orgSlug}
       activeTab={activeTab}
       onTabChange={handleTabChange}
       onBack={shellOnBack}
