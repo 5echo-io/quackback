@@ -533,8 +533,9 @@ function EmailStatusRow({ label, value, ok }: { label: string; value: string; ok
 
 /**
  * Read-only status of the email channel (outbound provider, from-address,
- * inbound reply threading). Configuration itself is environment-based; this
- * card just makes the resolved state visible to admins.
+ * inbound reply threading, support addresses that open new conversations).
+ * Configuration itself is environment-based; this card just makes the resolved
+ * state visible to admins.
  */
 function EmailChannelStatusCard() {
   const { data } = useQuery({
@@ -568,6 +569,15 @@ function EmailChannelStatusCard() {
           label="Inbound replies"
           value={data.inboundConfigured ? (data.inboundDomain ?? 'Configured') : 'Not configured'}
           ok={data.inboundConfigured}
+        />
+        <EmailStatusRow
+          label="New conversations by email"
+          value={
+            data.newConversationAddresses.length > 0
+              ? data.newConversationAddresses.join(', ')
+              : 'Off'
+          }
+          ok={data.newConversationAddresses.length > 0}
         />
       </div>
       {!data.inboundConfigured && (

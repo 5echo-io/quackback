@@ -8,6 +8,10 @@
 export interface ParsedInboundEmail {
   /** Recipient addresses (one is our plus-addressed `reply+<id>@domain`). */
   toAddresses: string[]
+  /** Cc / Bcc recipients as the provider reports them — only consulted when
+   *  matching a new-conversation support address, never for reply routing. */
+  ccAddresses: string[]
+  bccAddresses: string[]
   from: string | null
   subject: string | null
   text: string | null
@@ -16,10 +20,19 @@ export interface ParsedInboundEmail {
   /** Provider email id (Resend `email_id`) — used to fetch the body when the
    *  webhook payload is metadata-only (Resend `email.received`, #320). */
   emailId: string | null
+  /** Raw headers when the payload carries them (Resend's webhook does not; the
+   *  Received Emails API does). Read with `readHeader`. */
+  headers: unknown
 }
 
 function asString(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? v : null
+}
+
+/** A string-or-array address field, normalized to a string array. */
+function asAddressList(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter((t): t is string => typeof t === 'string')
+  return typeof v === 'string' ? [v] : []
 }
 
 /** Read a header value case-insensitively from either an array of
@@ -62,16 +75,70 @@ export function extractEmailAddress(raw: string | null): string | null {
   return candidate
 }
 
+/**
+ * The display name of a From header value (`"Jane Doe" <jane@x>` → `Jane Doe`),
+ * or null for a bare address, an empty name, or a still-encoded (RFC 2047)
+ * word we can't render as a name.
+ */
+export function extractDisplayName(raw: string | null): string | null {
+  if (!raw) return null
+  const angled = raw.match(/^(.*)<[^<>]+>\s*$/)
+  if (!angled) return null
+  const name = angled[1]
+    .trim()
+    .replace(/^"(.*)"$/, '$1')
+    .replace(/\\(.)/g, '$1')
+    .trim()
+  if (!name || name.includes('=?')) return null
+  return name.slice(0, 255)
+}
+
+// Sender local parts that only ever carry delivery reports, never a person.
+const AUTOMATED_SENDER_LOCAL_PARTS = new Set(['mailer-daemon', 'postmaster'])
+
+// `Precedence` values set by list servers and vacation responders.
+const AUTOMATED_PRECEDENCE = new Set(['bulk', 'junk', 'list', 'auto_reply'])
+
+/**
+ * Whether an inbound email was machine-generated — an auto-reply, bounce, or
+ * mailing-list / bulk message — and so must never open a conversation (it
+ * would otherwise answer our own notification and loop, or file a newsletter
+ * as a support request). Checks the sender and, when available, the headers
+ * RFC 3834 and common list/bounce practice define for exactly this.
+ */
+export function isAutomatedEmail(sender: string, headers: unknown): boolean {
+  const localPart = sender.slice(0, sender.indexOf('@')).toLowerCase()
+  if (AUTOMATED_SENDER_LOCAL_PARTS.has(localPart)) return true
+
+  const autoSubmitted = readHeader(headers, 'auto-submitted')?.trim().toLowerCase()
+  if (autoSubmitted && autoSubmitted !== 'no') return true
+
+  const precedence = readHeader(headers, 'precedence')?.trim().toLowerCase()
+  if (precedence && AUTOMATED_PRECEDENCE.has(precedence)) return true
+
+  if (
+    readHeader(headers, 'list-id') ||
+    readHeader(headers, 'list-unsubscribe') ||
+    readHeader(headers, 'x-autoreply') ||
+    readHeader(headers, 'x-autorespond') ||
+    readHeader(headers, 'x-failed-recipients')
+  ) {
+    return true
+  }
+
+  // A null reverse-path (`Return-Path: <>`) marks a delivery status notification.
+  if (readHeader(headers, 'return-path')?.trim() === '<>') return true
+
+  const contentType = readHeader(headers, 'content-type')?.toLowerCase() ?? ''
+  return contentType.startsWith('multipart/report')
+}
+
 export function parseInboundEmail(data: unknown): ParsedInboundEmail {
   const d = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
-  const rawTo = d.to
-  const toAddresses = Array.isArray(rawTo)
-    ? rawTo.filter((t): t is string => typeof t === 'string')
-    : typeof rawTo === 'string'
-      ? [rawTo]
-      : []
   return {
-    toAddresses,
+    toAddresses: asAddressList(d.to),
+    ccAddresses: asAddressList(d.cc),
+    bccAddresses: asAddressList(d.bcc),
     from: asString(d.from),
     subject: asString(d.subject),
     text: asString(d.text),
@@ -81,6 +148,7 @@ export function parseInboundEmail(data: unknown): ParsedInboundEmail {
       asString(d.email_id) ??
       asString(d.id),
     emailId: asString(d.email_id) ?? asString(d.id),
+    headers: d.headers ?? null,
   }
 }
 

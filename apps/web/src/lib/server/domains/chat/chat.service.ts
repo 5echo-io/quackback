@@ -261,9 +261,11 @@ export async function sendVisitorMessage(
         .insert(conversations)
         .values({
           visitorPrincipalId: author.principalId,
-          channel: 'messenger',
+          channel: input.channel ?? 'messenger',
           status: 'open',
-          subject: preview(content || fallbackLabel, attachments),
+          subject: input.subject?.trim()
+            ? truncate(input.subject.trim(), PREVIEW_LENGTH)
+            : preview(content || fallbackLabel, attachments),
         })
         .returning()
       conversation = createdConv

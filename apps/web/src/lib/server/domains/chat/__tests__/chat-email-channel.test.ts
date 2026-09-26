@@ -5,6 +5,9 @@ import {
   inboundReplyToAddress,
   conversationIdFromInboundAddress,
   signConversationId,
+  newConversationInboundAddresses,
+  matchNewConversationAddress,
+  isOwnInboundSender,
 } from '../chat.email-channel'
 
 // 'whsec_' + base64('testsecret') / base64('othersecret').
@@ -103,5 +106,87 @@ describe('conversationIdFromInboundAddress', () => {
   it('returns null for a non-plus-addressed recipient', () => {
     expect(conversationIdFromInboundAddress('bob@example.com', ENV)).toBeNull()
     expect(conversationIdFromInboundAddress('support@tenaevexeo.resend.app', ENV)).toBeNull()
+  })
+})
+
+describe('newConversationInboundAddresses', () => {
+  const WITH_ADDRESSES = {
+    ...ENV,
+    EMAIL_INBOUND_NEW_CONVERSATION_ADDRESSES:
+      ' Support@Example.com, help@example.com ,,not-an-address',
+  }
+
+  it('parses the comma-separated list, lower-cased, skipping invalid entries', () => {
+    expect([...newConversationInboundAddresses(WITH_ADDRESSES)]).toEqual([
+      'support@example.com',
+      'help@example.com',
+    ])
+  })
+
+  it('is empty (off) when the variable is unset', () => {
+    expect(newConversationInboundAddresses(ENV).size).toBe(0)
+  })
+
+  it('is empty (off) when the inbound channel itself is not configured', () => {
+    expect(
+      newConversationInboundAddresses({
+        EMAIL_INBOUND_NEW_CONVERSATION_ADDRESSES: 'support@example.com',
+      }).size
+    ).toBe(0)
+  })
+})
+
+describe('matchNewConversationAddress', () => {
+  const WITH_ADDRESSES = {
+    ...ENV,
+    EMAIL_INBOUND_NEW_CONVERSATION_ADDRESSES: 'support@example.com',
+  }
+
+  it('matches a configured recipient case-insensitively, including a name-addr', () => {
+    expect(matchNewConversationAddress(['SUPPORT@Example.COM'], WITH_ADDRESSES)).toBe(
+      'support@example.com'
+    )
+    expect(
+      matchNewConversationAddress(
+        ['someone@else.com', 'Acme Support <support@example.com>'],
+        WITH_ADDRESSES
+      )
+    ).toBe('support@example.com')
+  })
+
+  it('returns null for recipients that are not configured', () => {
+    expect(matchNewConversationAddress(['sales@example.com'], WITH_ADDRESSES)).toBeNull()
+    expect(matchNewConversationAddress([], WITH_ADDRESSES)).toBeNull()
+  })
+
+  it('returns null when the feature is off', () => {
+    expect(matchNewConversationAddress(['support@example.com'], ENV)).toBeNull()
+  })
+})
+
+describe('isOwnInboundSender', () => {
+  const OWN = {
+    ...ENV,
+    EMAIL_FROM: 'Acme <notifications@acme.example>',
+    EMAIL_INBOUND_NEW_CONVERSATION_ADDRESSES: 'support@acme.example',
+  }
+
+  it('recognizes the outbound EMAIL_FROM address', () => {
+    expect(isOwnInboundSender('notifications@acme.example', OWN)).toBe(true)
+  })
+
+  it('recognizes any address on the inbound receiving domain', () => {
+    expect(isOwnInboundSender('reply+abc.sig@tenaevexeo.resend.app', OWN)).toBe(true)
+    expect(isOwnInboundSender('anything@TENAEVEXEO.resend.app', OWN)).toBe(true)
+  })
+
+  it('recognizes a configured support address', () => {
+    expect(isOwnInboundSender('support@acme.example', OWN)).toBe(true)
+  })
+
+  it('does not match an ordinary sender, even on a lookalike domain', () => {
+    expect(isOwnInboundSender('jane@example.com', OWN)).toBe(false)
+    expect(isOwnInboundSender('jane@nottenaevexeo.resend.app', OWN)).toBe(false)
+    expect(isOwnInboundSender('jane@acme.example', OWN)).toBe(false)
   })
 })

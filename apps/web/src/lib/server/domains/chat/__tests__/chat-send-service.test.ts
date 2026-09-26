@@ -207,6 +207,32 @@ describe('sendVisitorMessage first-message conversation creation', () => {
     expect(actor).toMatchObject({ principalId: null, principalType: 'service' })
     expect(previousAgentPrincipalId).toBeNull()
   })
+
+  it('labels a new conversation messenger with a first-message subject by default', async () => {
+    await sendVisitorMessage({ content: 'Hello there' }, { principalId: visitor }, visitorActor)
+
+    expect(insertedConversations[0]).toMatchObject({ channel: 'messenger', subject: 'Hello there' })
+  })
+
+  it('creates on the given channel with the given subject (inbound email)', async () => {
+    await sendVisitorMessage(
+      { content: 'My order never arrived.', channel: 'email', subject: '  Order #123  ' },
+      { principalId: visitor },
+      visitorActor
+    )
+
+    expect(insertedConversations[0]).toMatchObject({ channel: 'email', subject: 'Order #123' })
+  })
+
+  it('falls back to the first-message subject when the given subject is blank', async () => {
+    await sendVisitorMessage(
+      { content: 'Hello there', channel: 'email', subject: '   ' },
+      { principalId: visitor },
+      visitorActor
+    )
+
+    expect(insertedConversations[0]).toMatchObject({ channel: 'email', subject: 'Hello there' })
+  })
 })
 
 describe('sendVisitorMessage attachments', () => {

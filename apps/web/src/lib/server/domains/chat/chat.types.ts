@@ -1,6 +1,11 @@
 import type { ConversationId, PrincipalId } from '@quackback/ids'
 import type { ChatMessageMetadata } from '@/lib/server/db'
-import type { ChatAttachment, ChatMessageDTO, ConversationDTO } from '@/lib/shared/chat/types'
+import type {
+  Channel,
+  ChatAttachment,
+  ChatMessageDTO,
+  ConversationDTO,
+} from '@/lib/shared/chat/types'
 
 /** Author identity passed into a send call (resolved from the auth context). */
 export interface ChatAuthorInput {
@@ -20,6 +25,12 @@ export interface SendVisitorMessageInput {
   visitorEmail?: string
   /** Channel provenance (e.g. inbound email message-id) persisted on the message. */
   metadata?: ChatMessageMetadata
+  /** Channel a NEW conversation arrives on; ignored when appending. Defaults to
+   *  'messenger' (the widget / portal live-chat surface). */
+  channel?: Channel
+  /** Subject for a NEW conversation (e.g. an inbound email's Subject); ignored
+   *  when appending. Defaults to a preview of the first message. */
+  subject?: string
 }
 
 export interface SendVisitorMessageResult {

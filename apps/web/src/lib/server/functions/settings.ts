@@ -813,21 +813,23 @@ const moderationDefaultSchema = z.object({
 
 /**
  * Read-only status of the conversation email channel (admin-only). Reports
- * which outbound provider the environment resolves to, the from-address, and
- * whether inbound reply threading is configured — names only, never secrets.
+ * which outbound provider the environment resolves to, the from-address,
+ * whether inbound reply threading is configured, and which support addresses
+ * open new conversations — names only, never secrets.
  */
 export const getEmailChannelStatusFn = createServerFn({ method: 'GET' }).handler(async () => {
   log.debug('get email channel status')
   try {
     await requireAuth({ roles: ['admin'] })
     const { getEmailProvider } = await import('@quackback/email')
-    const { isEmailInboundConfigured } =
+    const { isEmailInboundConfigured, newConversationInboundAddresses } =
       await import('@/lib/server/domains/chat/chat.email-channel')
     return {
       provider: getEmailProvider(),
       fromAddress: process.env.EMAIL_FROM ?? null,
       inboundConfigured: isEmailInboundConfigured(),
       inboundDomain: process.env.EMAIL_INBOUND_DOMAIN ?? null,
+      newConversationAddresses: [...newConversationInboundAddresses()],
     }
   } catch (error) {
     log.error({ err: error }, 'get email channel status failed')

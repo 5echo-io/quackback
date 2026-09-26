@@ -59,7 +59,11 @@ export async function handleInboundEmailWebhook(request: Request): Promise<Respo
       result.status === 'no_conversation' ||
       result.status === 'empty' ||
       result.status === 'from_mismatch' ||
-      result.status === 'rate_limited'
+      result.status === 'rate_limited' ||
+      result.status === 'invalid_sender' ||
+      result.status === 'own_sender' ||
+      result.status === 'automated' ||
+      result.status === 'team_member'
     ) {
       log.warn({ status: result.status }, 'dropped inbound email event')
     }
