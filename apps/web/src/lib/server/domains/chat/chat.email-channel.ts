@@ -14,14 +14,21 @@
  * the prefix is constant across every conversation, so carrying it would just
  * burn 13 characters of the RFC 5321 64-char local-part budget for no routing
  * value. The parser re-attaches it. The HMAC is still taken over the full id.
+ *
+ * Optionally, fresh mail to a configured support address (not a plus-address)
+ * opens a new conversation; that address list and the loop guard for our own
+ * senders live here too.
  */
 import { createHmac, timingSafeEqual } from 'crypto'
 import { ID_PREFIXES, type ConversationId } from '@quackback/ids'
+import { extractEmailAddress } from './chat.email-inbound'
 
 type EnvLike = Record<string, string | undefined>
 
 const INBOUND_DOMAIN_ENV = 'EMAIL_INBOUND_DOMAIN'
 const INBOUND_SECRET_ENV = 'EMAIL_INBOUND_SIGNING_SECRET'
+const NEW_CONVERSATION_ADDRESSES_ENV = 'EMAIL_INBOUND_NEW_CONVERSATION_ADDRESSES'
+const EMAIL_FROM_ENV = 'EMAIL_FROM'
 
 // `conversation_` — the constant TypeID prefix stripped from the local part on
 // the way out and re-attached on the way in.
@@ -102,4 +109,54 @@ export function conversationIdFromInboundAddress(
   const b = Buffer.from(expected)
   if (a.byteLength !== b.byteLength || !timingSafeEqual(a, b)) return null
   return id
+}
+
+/**
+ * The support addresses that open a NEW conversation when a fresh (non-reply)
+ * email arrives on them, from the comma-separated
+ * `EMAIL_INBOUND_NEW_CONVERSATION_ADDRESSES`. Lower-cased; entries that aren't
+ * a plausible single address are skipped. Empty — the feature is off — unless
+ * the inbound channel itself is configured, so this can never widen what the
+ * webhook accepts on its own.
+ */
+export function newConversationInboundAddresses(env: EnvLike = process.env): Set<string> {
+  const raw = env[NEW_CONVERSATION_ADDRESSES_ENV]
+  if (!raw || !isEmailInboundConfigured(env)) return new Set()
+  return new Set(
+    raw
+      .split(',')
+      .map((entry) => extractEmailAddress(entry))
+      .filter((addr): addr is string => addr !== null)
+  )
+}
+
+/** The configured support address among `recipients` (case-insensitive), or
+ *  null when none of them opens a new conversation. */
+export function matchNewConversationAddress(
+  recipients: string[],
+  env: EnvLike = process.env
+): string | null {
+  const addresses = newConversationInboundAddresses(env)
+  if (addresses.size === 0) return null
+  for (const recipient of recipients) {
+    const addr = extractEmailAddress(recipient)
+    if (addr && addresses.has(addr)) return addr
+  }
+  return null
+}
+
+/**
+ * Whether `sender` (a normalized address) is one of this instance's own: the
+ * outbound `EMAIL_FROM`, anything on the inbound receiving domain, or one of the
+ * new-conversation support addresses. Mail from these must never open a
+ * conversation — a bounce or auto-reply of our own notification would otherwise
+ * loop back in as a visitor message and trigger another email.
+ */
+export function isOwnInboundSender(sender: string, env: EnvLike = process.env): boolean {
+  const address = sender.toLowerCase()
+  const from = extractEmailAddress(env[EMAIL_FROM_ENV] ?? null)
+  if (from && address === from) return true
+  const domain = env[INBOUND_DOMAIN_ENV]?.trim().toLowerCase()
+  if (domain && address.endsWith(`@${domain}`)) return true
+  return newConversationInboundAddresses(env).has(address)
 }

@@ -111,14 +111,17 @@ function getResend(): Resend {
 
 /**
  * Fetch a received (inbound) email's content by its Resend email id.
- * Resend's `email.received` webhook is metadata-only (no text/html body) —
- * callers use this to pull the body before parsing (#320). Returns null when
- * no Resend API key is configured or the email cannot be found; throws on
- * other errors so the webhook route can 500 and let Resend redeliver.
+ * Resend's `email.received` webhook is metadata-only (no text/html body or
+ * headers) — callers use this to pull the body before parsing (#320), and the
+ * headers to recognize auto-replies and list mail. Returns null when no Resend
+ * API key is configured or the email cannot be found; throws on other errors so
+ * the webhook route can 500 and let Resend redeliver.
  */
-export async function getReceivedEmail(
-  emailId: string
-): Promise<{ text: string | null; html: string | null } | null> {
+export async function getReceivedEmail(emailId: string): Promise<{
+  text: string | null
+  html: string | null
+  headers: Record<string, string> | null
+} | null> {
   if (!getResendApiKey()) return null
   const { data, error } = await getResend().emails.receiving.get(emailId)
   if (error) {
@@ -126,7 +129,7 @@ export async function getReceivedEmail(
     if (error.name === 'not_found') return null
     throw new Error(`received-email fetch failed: ${error.name}`)
   }
-  return { text: data?.text ?? null, html: data?.html ?? null }
+  return { text: data?.text ?? null, html: data?.html ?? null, headers: data?.headers ?? null }
 }
 
 /**

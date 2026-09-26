@@ -8,7 +8,9 @@ import {
   parseInboundEmail,
   extractReplyText,
   extractEmailAddress,
+  extractDisplayName,
   htmlToText,
+  isAutomatedEmail,
 } from '../chat.email-inbound'
 
 describe('parseInboundEmail', () => {
@@ -75,6 +77,86 @@ describe('parseInboundEmail', () => {
     })
     expect(withHeader.messageId).toBe('<hdr@mail>')
     expect(withHeader.emailId).toBe('em_2')
+  })
+
+  it('normalizes cc / bcc recipients and passes raw headers through', () => {
+    const parsed = parseInboundEmail({
+      to: ['a@x.com'],
+      cc: ['support@example.com', 42],
+      bcc: 'hidden@example.com',
+      headers: { 'Auto-Submitted': 'auto-replied' },
+    })
+    expect(parsed.ccAddresses).toEqual(['support@example.com'])
+    expect(parsed.bccAddresses).toEqual(['hidden@example.com'])
+    expect(parsed.headers).toEqual({ 'Auto-Submitted': 'auto-replied' })
+
+    const bare = parseInboundEmail({ to: ['a@x.com'] })
+    expect(bare.ccAddresses).toEqual([])
+    expect(bare.bccAddresses).toEqual([])
+    expect(bare.headers).toBeNull()
+  })
+})
+
+describe('extractDisplayName', () => {
+  it('returns the display name of a name-addr, unquoted', () => {
+    expect(extractDisplayName('Jane Visitor <jane@example.com>')).toBe('Jane Visitor')
+    expect(extractDisplayName('"Doe, Jane" <jane@example.com>')).toBe('Doe, Jane')
+  })
+
+  it('returns null for a bare address, an empty name, or an encoded word', () => {
+    expect(extractDisplayName('jane@example.com')).toBeNull()
+    expect(extractDisplayName('<jane@example.com>')).toBeNull()
+    expect(extractDisplayName('"" <jane@example.com>')).toBeNull()
+    expect(extractDisplayName('=?utf-8?B?SsO4cmdlbg==?= <j@example.com>')).toBeNull()
+    expect(extractDisplayName(null)).toBeNull()
+  })
+})
+
+describe('isAutomatedEmail', () => {
+  it('passes an ordinary message', () => {
+    expect(isAutomatedEmail('jane@example.com', null)).toBe(false)
+    expect(
+      isAutomatedEmail('jane@example.com', {
+        'Auto-Submitted': 'no',
+        Precedence: 'first-class',
+        'Content-Type': 'multipart/alternative; boundary=x',
+      })
+    ).toBe(false)
+  })
+
+  it('flags bounce senders', () => {
+    expect(isAutomatedEmail('MAILER-DAEMON@mx.example.com', null)).toBe(true)
+    expect(isAutomatedEmail('postmaster@example.com', null)).toBe(true)
+  })
+
+  it('flags RFC 3834 Auto-Submitted mail (auto-replies, vacation responders)', () => {
+    expect(isAutomatedEmail('jane@example.com', { 'auto-submitted': 'auto-replied' })).toBe(true)
+    expect(
+      isAutomatedEmail('jane@example.com', [{ name: 'Auto-Submitted', value: 'auto-generated' }])
+    ).toBe(true)
+  })
+
+  it('flags bulk / list / auto_reply Precedence', () => {
+    for (const value of ['bulk', 'list', 'junk', 'auto_reply', 'Bulk']) {
+      expect(isAutomatedEmail('jane@example.com', { Precedence: value })).toBe(true)
+    }
+  })
+
+  it('flags mailing-list and autoresponder headers', () => {
+    expect(isAutomatedEmail('jane@example.com', { 'List-Id': '<news.example.com>' })).toBe(true)
+    expect(isAutomatedEmail('jane@example.com', { 'List-Unsubscribe': '<mailto:u@x>' })).toBe(true)
+    expect(isAutomatedEmail('jane@example.com', { 'X-Autoreply': 'yes' })).toBe(true)
+    expect(isAutomatedEmail('jane@example.com', { 'X-Autorespond': 'yes' })).toBe(true)
+  })
+
+  it('flags delivery status notifications', () => {
+    expect(isAutomatedEmail('jane@example.com', { 'X-Failed-Recipients': 'a@b.com' })).toBe(true)
+    expect(isAutomatedEmail('jane@example.com', { 'Return-Path': '<>' })).toBe(true)
+    expect(
+      isAutomatedEmail('jane@example.com', {
+        'Content-Type': 'multipart/report; report-type=delivery-status',
+      })
+    ).toBe(true)
   })
 })
 

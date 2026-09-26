@@ -86,6 +86,27 @@ describe('handleInboundEmailWebhook', () => {
     await expect(res.json()).resolves.toMatchObject({ status: 'ingested' })
   })
 
+  it('reports a conversation opened from a support address', async () => {
+    ingestInboundEmail.mockResolvedValue({ status: 'created', conversationId: 'conversation_2' })
+
+    const res = await handleInboundEmailWebhook(req({ type: 'email.received', data: {} }))
+
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({ status: 'created' })
+  })
+
+  it.each(['automated', 'own_sender', 'team_member', 'invalid_sender'])(
+    'acks (200) mail it ignores as %s so the provider stops retrying',
+    async (status) => {
+      ingestInboundEmail.mockResolvedValue({ status })
+
+      const res = await handleInboundEmailWebhook(req({ type: 'email.received', data: {} }))
+
+      expect(res.status).toBe(200)
+      await expect(res.json()).resolves.toEqual({ status })
+    }
+  )
+
   it('acks and drops a verified event when conversations are disabled (no ingest)', async () => {
     isConversationsEnabled.mockResolvedValue(false)
 
