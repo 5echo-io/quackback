@@ -10,10 +10,13 @@ import { WidgetShell } from '@/components/widget/widget-shell'
 import {
   type WidgetTab,
   type WidgetView,
+  type WidgetScope,
   resolveInitialTab,
   resolveInitialView,
   supportRootView,
   homeEnabled,
+  parseWidgetScope,
+  scopeTabs,
 } from '@/components/widget/widget-nav'
 import { WidgetHome } from '@/components/widget/widget-home'
 import { WidgetOverview } from '@/components/widget/widget-overview'
@@ -162,13 +165,19 @@ function WidgetPage() {
     statuses,
     boards,
     boardPermissions,
-    tabs,
+    tabs: enabledTabs,
     linkPreviews,
     defaultBoard,
     portalAccess,
     portalOrigin,
   } = Route.useLoaderData()
   const { ensureSession, sessionVersion } = useWidgetAuth()
+
+  // The host can open the widget narrowed to one door (see WidgetScope). Every
+  // `tabs` below is the scoped set; `enabledTabs` is what the admin switched
+  // on, and the only thing a scope is ever computed from.
+  const [scope, setScope] = useState<WidgetScope>('all')
+  const tabs = useMemo(() => scopeTabs(enabledTabs, scope), [enabledTabs, scope])
 
   // The loader seeds boardPermissions for the anonymous SSR baseline (no Bearer
   // at loader time). Refetch it for the REAL actor with the widget's Bearer
@@ -235,23 +244,37 @@ function WidgetPage() {
       const msg = event.data
       if (!msg || typeof msg !== 'object' || msg.type !== 'quackback:open' || !msg.data) return
 
-      const opts = msg.data as { view?: string }
-      if (opts.view === 'changelog' && tabs.changelog) {
+      // Every open carries its scope, and one that names none is the whole
+      // widget — so a door that asked for less never leaks into the next one.
+      const opts = msg.data as { view?: string; scope?: unknown }
+      const nextScope = parseWidgetScope(opts.scope)
+      const next = scopeTabs(enabledTabs, nextScope)
+      setScope(nextScope)
+      if (opts.view === 'changelog' && next.changelog) {
         setActiveTab('changelog')
         setView('changelog')
-      } else if (opts.view === 'help' && (tabs.help || tabs.chat)) {
+      } else if (opts.view === 'feedback' && next.feedback) {
+        setSelectedPostId(null)
+        setActiveTab('feedback')
+        setView('feedback')
+      } else if (opts.view === 'help' && (next.help || next.chat)) {
         setActiveTab('help')
-        setView(supportRootView(tabs))
-      } else if ((opts.view === 'chat' || opts.view === 'live-chat') && tabs.chat) {
+        setView(supportRootView(next))
+      } else if ((opts.view === 'chat' || opts.view === 'live-chat') && next.chat) {
         openChat()
-      } else if ((opts.view === 'home' || opts.view === 'overview') && homeEnabled(tabs)) {
+      } else if ((opts.view === 'home' || opts.view === 'overview') && homeEnabled(next)) {
         setActiveTab('home')
         setView('overview')
+      } else if (nextScope !== scope) {
+        // No view this scope can show: land where the scope starts rather
+        // than leave the previous door's view on screen.
+        setActiveTab(resolveInitialTab(next))
+        setView(resolveInitialView(next))
       }
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [tabs, openChat])
+  }, [enabledTabs, scope, openChat])
 
   const handlePostCreated = useCallback((post: SuccessPost) => {
     setCreatedPosts((prev) => [

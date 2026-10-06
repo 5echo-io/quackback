@@ -7,6 +7,8 @@ import {
   visibleTabs,
   resolveInitialTab,
   resolveInitialView,
+  parseWidgetScope,
+  scopeTabs,
 } from '../widget-nav'
 
 // Nav model: Chat is folded into the Help (support) surface, so the bottom bar
@@ -124,5 +126,54 @@ describe('resolveInitialView', () => {
   })
   it('lands on the first surface root when the admin disables Home', () => {
     expect(resolveInitialView({ feedback: true, changelog: true, home: false })).toBe('feedback')
+  })
+})
+
+describe('parseWidgetScope', () => {
+  it('accepts the two named doors', () => {
+    expect(parseWidgetScope('support')).toBe('support')
+    expect(parseWidgetScope('feedback')).toBe('feedback')
+  })
+  it('treats anything else as the whole widget', () => {
+    expect(parseWidgetScope(undefined)).toBe('all')
+    expect(parseWidgetScope('all')).toBe('all')
+    expect(parseWidgetScope('chat')).toBe('all')
+    expect(parseWidgetScope({ scope: 'support' })).toBe('all')
+  })
+})
+
+describe('scopeTabs', () => {
+  const everything = { feedback: true, changelog: true, help: true, chat: true }
+
+  it('leaves the admin config untouched for the whole widget', () => {
+    expect(scopeTabs(everything, 'all')).toBe(everything)
+  })
+
+  it('support keeps only the support surface, with no Home and no tab bar', () => {
+    const scoped = scopeTabs(everything, 'support')
+    expect(visibleTabs(scoped)).toEqual(['help'])
+    expect(resolveInitialView(scoped)).toBe('help')
+    expect(resolveInitialView(scopeTabs({ feedback: true, chat: true }, 'support'))).toBe(
+      'messages'
+    )
+  })
+
+  it('feedback keeps the board and the changelog, landing on the board', () => {
+    const scoped = scopeTabs(everything, 'feedback')
+    expect(visibleTabs(scoped)).toEqual(['feedback', 'changelog'])
+    expect(resolveInitialTab(scoped)).toBe('feedback')
+    expect(resolveInitialView(scoped)).toBe('feedback')
+  })
+
+  it('never switches on a surface the admin turned off', () => {
+    expect(scopeTabs({ feedback: true, chat: true }, 'feedback').changelog).toBeFalsy()
+    expect(scopeTabs({ feedback: true, chat: true }, 'support').help).toBeFalsy()
+  })
+
+  it('ignores a scope that would leave nothing to show', () => {
+    const feedbackOnly = { feedback: true, changelog: true }
+    expect(scopeTabs(feedbackOnly, 'support')).toBe(feedbackOnly)
+    const supportOnly = { help: true, chat: true }
+    expect(scopeTabs(supportOnly, 'feedback')).toBe(supportOnly)
   })
 })
