@@ -25,4 +25,11 @@ describe('isNewerVersion', () => {
   it('returns false when latest minor is lower', () => {
     expect(isNewerVersion('0.5.0', '0.4.9')).toBe(false)
   })
+
+  it('compares a suffixed build by the release it is built on', () => {
+    expect(isNewerVersion('0.13.2-5echo.1', '0.13.3')).toBe(true)
+    expect(isNewerVersion('0.13.2-5echo.1', '0.14.0')).toBe(true)
+    expect(isNewerVersion('0.13.2-5echo.3', '0.13.2')).toBe(false)
+    expect(isNewerVersion('0.13.2-5echo.1', '0.13.1')).toBe(false)
+  })
 })

@@ -5,9 +5,16 @@ const log = logger.child({ component: 'version' })
 
 // --- Semver comparison (exported for testing) ---
 
+// Only the numeric core is compared. A build of an upstream release carries a
+// pre-release suffix (`0.13.2-5echo.1`), and splitting that on '.' alone made
+// the patch `NaN`, which hid every upstream patch release from it.
+function versionCore(version: string): number[] {
+  return version.split('-')[0].split('.').map(Number)
+}
+
 export function isNewerVersion(current: string, latest: string): boolean {
-  const [cMajor, cMinor, cPatch] = current.split('.').map(Number)
-  const [lMajor, lMinor, lPatch] = latest.split('.').map(Number)
+  const [cMajor, cMinor, cPatch] = versionCore(current)
+  const [lMajor, lMinor, lPatch] = versionCore(latest)
   if (lMajor !== cMajor) return lMajor > cMajor
   if (lMinor !== cMinor) return lMinor > cMinor
   return lPatch > cPatch
