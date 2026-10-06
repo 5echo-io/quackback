@@ -11,6 +11,10 @@ bun run build && bun run db:generate && bun run db:migrate
 bun run test && bun run test:e2e && bun run lint && bun run typecheck
 ```
 
+## This fork
+
+5echo's standalone build of upstream, released on its own and run by more than one project. Pull requests target `dev`; `main` moves only when a release is cut. Never "Sync fork" on `main`. Releasing, versions and upstream moves: `RELEASING.md`.
+
 ## Rules
 
 - Entity IDs are branded TypeIDs via `@quackback/ids`
