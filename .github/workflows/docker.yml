@@ -141,6 +141,22 @@ jobs:
           DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{json .Manifest.Digest}}' | tr -d '"')
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
 
+      # The line a consumer pins, so nobody has to dig it out of the logs. The
+      # tag is for people; the digest is what gets pulled — a tag can be
+      # moved, a digest cannot. See RELEASING.md.
+      - name: Summarise the pin
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          IMAGE_DIGEST: ${{ steps.index.outputs.digest }}
+        run: |
+          {
+            echo "### Published"
+            echo
+            echo '```'
+            echo "${IMAGE}:${VERSION}@${IMAGE_DIGEST}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
