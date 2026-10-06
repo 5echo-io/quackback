@@ -22,6 +22,7 @@ import { sendToHost } from '@/lib/client/widget-bridge'
 import { widgetQueryKeys } from '@/lib/client/hooks/use-widget-vote'
 import { authClient } from '@/lib/client/auth-client'
 import { resolveIdentifyAction, type SessionSource } from './identify-precedence'
+import { applyHostTheme } from './host-theme'
 import type { WidgetMetadata, WidgetEventName, WidgetEventMap } from '@/lib/shared/widget/types'
 import { normalizeLocale, DEFAULT_LOCALE, type SupportedLocale } from '@/lib/shared/i18n'
 import { htmlLangDir } from '@/lib/shared/document-locale'
@@ -373,6 +374,11 @@ export function WidgetAuthProvider({
       if (msg.type === 'quackback:locale' && typeof msg.data === 'string') {
         const normalized = normalizeLocale(msg.data)
         if (normalized) setLocale(normalized)
+        return
+      }
+
+      if (msg.type === 'quackback:theme') {
+        applyHostTheme(msg.data)
         return
       }
 

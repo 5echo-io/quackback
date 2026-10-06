@@ -43,11 +43,15 @@ export interface WidgetInboundMessages {
   'quackback:locale': string
   'quackback:open':
     | {
-        view?: 'home' | 'new-post'
+        view?: 'home' | 'new-post' | 'feedback' | 'changelog' | 'help' | 'chat'
         title?: string
         board?: string
+        /** Narrow the widget to one door; see WidgetScope in widget-nav. */
+        scope?: 'all' | 'support' | 'feedback'
       }
     | undefined
+  /** Host colours; see host-theme.ts. Hex only — anything else is cleared. */
+  'quackback:theme': { primary?: string; primaryForeground?: string } | null
 }
 
 // ---- Iframe -> SDK Messages ----

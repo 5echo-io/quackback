@@ -99,3 +99,31 @@ export function resolveInitialView(tabs: EnabledTabs): WidgetView {
   if (supportEnabled(tabs)) return supportRootView(tabs)
   return 'feedback'
 }
+
+/**
+ * A narrowing the host asks for when it opens the widget, so one board can be
+ * reached through separate doors that each show only their own surfaces.
+ * 'all' is the whole widget and the default for an open that names none.
+ * 'support' keeps the support surface (help articles + chat); 'feedback' keeps
+ * the board and the changelog. Neither shows the aggregated Home — a scoped
+ * door lands on its own surface.
+ */
+export type WidgetScope = 'all' | 'support' | 'feedback'
+
+/** Anything the host sends that is not a known scope means the whole widget. */
+export function parseWidgetScope(raw: unknown): WidgetScope {
+  return raw === 'support' || raw === 'feedback' ? raw : 'all'
+}
+
+/**
+ * The enabled surfaces under `scope`. A scope only ever removes surfaces — it
+ * cannot switch on one the admin turned off — and one that would leave
+ * nothing at all is ignored rather than opening an empty widget.
+ */
+export function scopeTabs(tabs: EnabledTabs, scope: WidgetScope): EnabledTabs {
+  let scoped: EnabledTabs
+  if (scope === 'support') scoped = { ...tabs, feedback: false, changelog: false, home: false }
+  else if (scope === 'feedback') scoped = { ...tabs, help: false, chat: false, home: false }
+  else return tabs
+  return contentSurfaceCount(scoped) > 0 ? scoped : tabs
+}
