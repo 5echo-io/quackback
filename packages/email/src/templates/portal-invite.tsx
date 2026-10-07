@@ -1,6 +1,7 @@
-import { Button, Heading, Link, Section, Text } from '@react-email/components'
+import { Heading, Section, Text } from '@react-email/components'
 import { EmailLayout, TransactionalFooter } from './email-layout'
-import { typography, button, utils } from './shared-styles'
+import { BrandButton, BrandLink } from './brand-elements'
+import { typography, utils } from './shared-styles'
 
 interface PortalInviteEmailProps {
   workspaceName: string
@@ -31,8 +32,7 @@ export function PortalInviteEmail({
       {personalMessage && (
         <Section
           style={{
-            backgroundColor: '#f6f8fa',
-            borderLeft: '3px solid #d0d7de',
+            ...utils.quote,
             padding: '12px 16px',
             marginTop: '24px',
             marginBottom: '8px',
@@ -47,17 +47,13 @@ export function PortalInviteEmail({
 
       {/* CTA Button */}
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
-        <Button style={button.primary} href={inviteLink}>
-          Accept invitation
-        </Button>
+        <BrandButton href={inviteLink}>Accept invitation</BrandButton>
       </Section>
 
       {/* Fallback Link */}
       <Text style={typography.textSmall}>
         Or copy and paste this link into your browser:{' '}
-        <Link href={inviteLink} style={utils.link}>
-          {inviteLink}
-        </Link>
+        <BrandLink href={inviteLink}>{inviteLink}</BrandLink>
       </Text>
 
       {/* Footer */}

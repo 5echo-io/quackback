@@ -1,45 +1,51 @@
 /**
- * Shared email styles for Quackback emails
+ * Shared email styles.
  *
- * Ensures consistent branding across all email templates.
- * Colors are derived from the app's design system.
+ * Neutral on purpose: the one colour an email carries is the board's own
+ * brand, applied by the components in brand-elements.tsx from the brand
+ * `sendEmail` resolves. Nothing here may name a colour that belongs to a
+ * product — a board run by somebody else should not arrive in our yellow.
+ *
+ * The shape is a grey page, a white card with a hairline border and a strip
+ * of brand colour across its top, and a quiet footer under a rule.
  */
 
-export const DEFAULT_LOGO_URL = 'https://quackback.io/logo.png'
-
-// Brand colors (converted from oklch to hex for email compatibility)
 export const colors = {
-  // Primary gold - oklch(0.886 0.176 86) ≈ #FFD43B
-  primary: '#FFD43B',
-  primaryDark: '#F2C230',
+  // Text
+  heading: '#16181d',
+  text: '#525a68',
+  textMuted: '#8b92a1',
 
-  // Text colors
-  heading: '#0f172a', // slate-900
-  text: '#334155', // slate-700
-  textMuted: '#64748b', // slate-500
-  textLight: '#94a3b8', // slate-400
-
-  // Background colors
-  background: '#f8fafc', // slate-50
+  // Surfaces
+  background: '#f5f6f9',
   surface: '#ffffff',
-  surfaceMuted: '#f1f5f9', // slate-100
+  surfaceMuted: '#f5f6f9',
 
-  // Border
-  border: '#e2e8f0', // slate-200
+  // Lines
+  border: '#e7e8ee',
+  rule: '#eeeff3',
 }
+
+const fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif'
 
 // Common layout styles
 export const layout = {
   main: {
     backgroundColor: colors.background,
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    fontFamily,
+    margin: '0',
+    padding: '32px 12px 44px',
   },
   container: {
     backgroundColor: colors.surface,
-    padding: '48px 32px',
-    maxWidth: '560px',
-    borderRadius: '12px',
+    border: `1px solid ${colors.border}`,
+    borderRadius: '16px',
+    borderCollapse: 'separate' as const,
+    overflow: 'hidden' as const,
+    maxWidth: '600px',
+  },
+  content: {
+    padding: '34px 40px 30px',
   },
 }
 
@@ -47,11 +53,12 @@ export const layout = {
 export const typography = {
   h1: {
     color: colors.heading,
-    fontSize: '24px',
+    fontSize: '26px',
     fontWeight: '700' as const,
-    lineHeight: '32px',
+    letterSpacing: '-0.6px',
+    lineHeight: '1.2',
     marginTop: '0',
-    marginBottom: '8px',
+    marginBottom: '12px',
   },
   h2: {
     color: colors.heading,
@@ -63,8 +70,8 @@ export const typography = {
   },
   text: {
     color: colors.text,
-    fontSize: '16px',
-    lineHeight: '26px',
+    fontSize: '15.5px',
+    lineHeight: '1.6',
     marginTop: '0',
     marginBottom: '24px',
   },
@@ -76,24 +83,23 @@ export const typography = {
     marginBottom: '16px',
   },
   footer: {
-    color: colors.textLight,
-    fontSize: '13px',
-    lineHeight: '20px',
+    color: colors.textMuted,
+    fontSize: '12.5px',
+    lineHeight: '1.6',
+    borderTop: `1px solid ${colors.rule}`,
+    paddingTop: '18px',
     marginTop: '32px',
     marginBottom: '0',
-    textAlign: 'center' as const,
   },
 }
 
-// Button styles
+// Button shape. The fill and text colour come from the brand (BrandButton).
 export const button = {
-  primary: {
-    backgroundColor: colors.primary,
-    borderRadius: '8px',
-    color: '#09090b',
-    fontSize: '16px',
+  base: {
+    borderRadius: '6px',
+    fontSize: '15px',
     fontWeight: '600',
-    padding: '14px 28px',
+    padding: '12px 28px',
     textDecoration: 'none',
     display: 'inline-block',
   },
@@ -102,13 +108,13 @@ export const button = {
 // Utility styles
 export const utils = {
   divider: {
-    borderTop: `1px solid ${colors.border}`,
+    borderTop: `1px solid ${colors.rule}`,
     marginTop: '32px',
     marginBottom: '32px',
   },
+  // Link shape. The colour comes from the brand (BrandLink).
   link: {
-    color: '#b45309',
-    textDecoration: 'none',
+    textDecoration: 'underline',
   },
   codeBox: {
     backgroundColor: colors.surfaceMuted,
@@ -126,26 +132,41 @@ export const utils = {
     marginTop: '0',
     marginBottom: '0',
   },
+  quote: {
+    backgroundColor: colors.surfaceMuted,
+    borderLeft: `3px solid ${colors.border}`,
+  },
 }
 
-// Logo/branding
+// Logo / wordmark above the card
 export const branding = {
-  logoContainer: {
-    textAlign: 'center' as const,
-    paddingBottom: '32px',
+  header: {
+    padding: '0 8px 14px',
   },
   logo: {
-    width: 48,
-    height: 48,
+    height: 40,
+    maxWidth: 200,
     display: 'block' as const,
-    margin: '0 auto',
   },
-  appName: {
+  mark: {
+    width: '26px',
+    height: '26px',
+    borderRadius: '7px',
+    fontSize: '0',
+    lineHeight: '0',
+  },
+  name: {
     color: colors.heading,
-    fontSize: '18px',
+    fontFamily,
+    fontSize: '15px',
     fontWeight: '700',
-    marginTop: '12px',
-    marginBottom: '0',
-    textAlign: 'center' as const,
+    letterSpacing: '-0.2px',
+    paddingLeft: '11px',
+    margin: '0',
+  },
+  strip: {
+    height: '3px',
+    lineHeight: '3px',
+    fontSize: '0',
   },
 }

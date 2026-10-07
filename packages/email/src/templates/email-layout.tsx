@@ -1,19 +1,24 @@
 import {
   Body,
+  Column,
   Container,
   Head,
   Html,
   Img,
   Preview,
+  Row,
   Section,
   Text,
-  Link,
 } from '@react-email/components'
-import { layout, branding, typography, utils, colors, DEFAULT_LOGO_URL } from './shared-styles'
+import { useEmailBrand } from '../brand'
+import { BrandLink, BrandStrip } from './brand-elements'
+import { layout, branding, typography } from './shared-styles'
 
 interface EmailLayoutProps {
   preview: string
+  /** Overrides the brand's logo — callers that already resolved one pass it. */
   logoUrl?: string
+  /** The board's name: the logo's alt text, and the wordmark when there is no logo. */
   logoAlt?: string
   children: React.ReactNode
   footer?: React.ReactNode
@@ -23,40 +28,54 @@ interface EmailLayoutProps {
  * Shared email layout with proper HTML email best practices:
  * - Wrapper Section with background color (fallback for clients that strip <body> styles)
  * - Centered container via React Email's align="center" (no margin:auto)
- * - Consistent logo, spacing, and footer placement
+ * - Consistent header, spacing, and footer placement
+ *
+ * The header is the board's logo, or its name as a wordmark when it has no
+ * logo — never the vendor's logo, which is what an unbranded board used to
+ * send. A board with neither shows nothing above the card.
  */
-export function EmailLayout({
-  preview,
-  logoUrl,
-  logoAlt = 'Quackback',
-  children,
-  footer,
-}: EmailLayoutProps) {
+export function EmailLayout({ preview, logoUrl, logoAlt, children, footer }: EmailLayoutProps) {
+  const brand = useEmailBrand()
+  const logo = logoUrl ?? brand.logoUrl ?? undefined
+  const name = logoAlt ?? brand.name
+
   return (
     <Html>
       <Head />
       <Preview>{preview}</Preview>
       <Body style={layout.main}>
-        {/* Wrapper Section provides background color for clients that strip <body> styles */}
-        <Section style={{ backgroundColor: colors.background }}>
-          <Container style={layout.container}>
-            {/* Logo */}
-            <Section style={branding.logoContainer}>
-              <Img
-                src={logoUrl ?? DEFAULT_LOGO_URL}
-                alt={logoAlt}
-                width={branding.logo.width}
-                height={branding.logo.height}
-                style={branding.logo}
-              />
+        <Container style={{ maxWidth: layout.container.maxWidth }}>
+          {(logo || name) && (
+            <Section style={branding.header}>
+              {logo ? (
+                <Img
+                  src={logo}
+                  alt={name ?? ''}
+                  height={branding.logo.height}
+                  style={branding.logo}
+                />
+              ) : (
+                <Row>
+                  <Column style={{ ...branding.mark, backgroundColor: brand.primary }}>
+                    &nbsp;
+                  </Column>
+                  <Column>
+                    <Text style={branding.name}>{name}</Text>
+                  </Column>
+                </Row>
+              )}
             </Section>
+          )}
 
-            {children}
+          <Container style={layout.container}>
+            <BrandStrip />
+            <Section style={layout.content}>
+              {children}
 
-            {/* Footer */}
-            {footer}
+              {footer}
+            </Section>
           </Container>
-        </Section>
+        </Container>
       </Body>
     </Html>
   )
@@ -81,9 +100,9 @@ export function NotificationFooter({
     <Text style={typography.footer}>
       {reason}
       <br />
-      <Link href={unsubscribeUrl} style={{ ...utils.link, fontSize: '13px' }}>
+      <BrandLink href={unsubscribeUrl} style={{ fontSize: '12.5px' }}>
         {unsubscribeLabel}
-      </Link>
+      </BrandLink>
     </Text>
   )
 }

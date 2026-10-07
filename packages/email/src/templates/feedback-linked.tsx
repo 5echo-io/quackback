@@ -1,6 +1,7 @@
-import { Button, Heading, Section, Text } from '@react-email/components'
+import { Heading, Section, Text } from '@react-email/components'
 import { EmailLayout, NotificationFooter } from './email-layout'
-import { typography, button, colors } from './shared-styles'
+import { BrandButton } from './brand-elements'
+import { typography, colors } from './shared-styles'
 
 interface FeedbackLinkedEmailProps {
   recipientName?: string
@@ -55,9 +56,7 @@ export function FeedbackLinkedEmail({
 
       {/* CTA Button */}
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
-        <Button style={button.primary} href={postUrl}>
-          View Feedback
-        </Button>
+        <BrandButton href={postUrl}>View Feedback</BrandButton>
       </Section>
 
       {/* Footer */}

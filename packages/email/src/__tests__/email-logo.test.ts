@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@react-email/components'
-import { DEFAULT_LOGO_URL } from '../templates/shared-styles'
+// Upstream's fallback. A board run by somebody else must never send it.
+const VENDOR_LOGO = 'https://quackback.io/logo.png'
 import { WelcomeEmail } from '../templates/welcome'
 import { InvitationEmail } from '../templates/invitation'
 import { MagicLinkEmail } from '../templates/magic-link'
@@ -23,7 +24,7 @@ describe('email templates use brand logo when provided', () => {
       })
     )
     expect(html).toContain(BRAND_LOGO)
-    expect(html).not.toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
     expect(html).toContain('alt="Acme"')
   })
 
@@ -37,7 +38,7 @@ describe('email templates use brand logo when provided', () => {
       })
     )
     expect(html).toContain(BRAND_LOGO)
-    expect(html).not.toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
     expect(html).toContain('alt="Acme"')
   })
 
@@ -50,7 +51,7 @@ describe('email templates use brand logo when provided', () => {
       })
     )
     expect(html).toContain(BRAND_LOGO)
-    expect(html).not.toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
   })
 
   it('PasswordResetEmail renders brand logo', async () => {
@@ -58,7 +59,7 @@ describe('email templates use brand logo when provided', () => {
       PasswordResetEmail({ resetLink: 'https://example.com/reset', logoUrl: BRAND_LOGO })
     )
     expect(html).toContain(BRAND_LOGO)
-    expect(html).not.toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
   })
 
   it('StatusChangeEmail renders brand logo', async () => {
@@ -74,7 +75,7 @@ describe('email templates use brand logo when provided', () => {
       })
     )
     expect(html).toContain(BRAND_LOGO)
-    expect(html).not.toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
     expect(html).toContain('alt="Acme"')
   })
 
@@ -92,7 +93,7 @@ describe('email templates use brand logo when provided', () => {
       })
     )
     expect(html).toContain(BRAND_LOGO)
-    expect(html).not.toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
     expect(html).toContain('alt="Acme"')
   })
 
@@ -108,7 +109,7 @@ describe('email templates use brand logo when provided', () => {
       })
     )
     expect(html).toContain(BRAND_LOGO)
-    expect(html).not.toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
     expect(html).toContain('alt="Acme"')
   })
 
@@ -123,13 +124,13 @@ describe('email templates use brand logo when provided', () => {
       })
     )
     expect(html).toContain(BRAND_LOGO)
-    expect(html).not.toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
     expect(html).toContain('alt="Acme"')
   })
 })
 
-describe('email templates fall back to default logo when logoUrl not provided', () => {
-  it('WelcomeEmail renders default logo', async () => {
+describe('without a logo, email templates never fall back to the vendor logo', () => {
+  it('WelcomeEmail renders no vendor logo', async () => {
     const html = await render(
       WelcomeEmail({
         name: 'Alice',
@@ -137,10 +138,10 @@ describe('email templates fall back to default logo when logoUrl not provided', 
         dashboardUrl: 'https://example.com/dashboard',
       })
     )
-    expect(html).toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
   })
 
-  it('InvitationEmail renders default logo', async () => {
+  it('InvitationEmail renders no vendor logo', async () => {
     const html = await render(
       InvitationEmail({
         invitedByName: 'Bob',
@@ -148,25 +149,25 @@ describe('email templates fall back to default logo when logoUrl not provided', 
         inviteLink: 'https://example.com/invite',
       })
     )
-    expect(html).toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
   })
 
-  it('MagicLinkEmail renders default logo', async () => {
+  it('MagicLinkEmail renders no vendor logo', async () => {
     const html = await render(
       MagicLinkEmail({
         signInUrl: 'https://example.com/verify-magic-link?token=abc',
         code: '123456',
       })
     )
-    expect(html).toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
   })
 
-  it('PasswordResetEmail renders default logo', async () => {
+  it('PasswordResetEmail renders no vendor logo', async () => {
     const html = await render(PasswordResetEmail({ resetLink: 'https://example.com/reset' }))
-    expect(html).toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
   })
 
-  it('StatusChangeEmail renders default logo', async () => {
+  it('StatusChangeEmail renders no vendor logo', async () => {
     const html = await render(
       StatusChangeEmail({
         postTitle: 'Test',
@@ -177,10 +178,10 @@ describe('email templates fall back to default logo when logoUrl not provided', 
         unsubscribeUrl: 'https://example.com/unsub',
       })
     )
-    expect(html).toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
   })
 
-  it('NewCommentEmail renders default logo', async () => {
+  it('NewCommentEmail renders no vendor logo', async () => {
     const html = await render(
       NewCommentEmail({
         postTitle: 'Test',
@@ -192,10 +193,10 @@ describe('email templates fall back to default logo when logoUrl not provided', 
         unsubscribeUrl: 'https://example.com/unsub',
       })
     )
-    expect(html).toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
   })
 
-  it('ChangelogPublishedEmail renders default logo', async () => {
+  it('ChangelogPublishedEmail renders no vendor logo', async () => {
     const html = await render(
       ChangelogPublishedEmail({
         changelogTitle: 'v1.0',
@@ -205,10 +206,10 @@ describe('email templates fall back to default logo when logoUrl not provided', 
         unsubscribeUrl: 'https://example.com/unsub',
       })
     )
-    expect(html).toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
   })
 
-  it('FeedbackLinkedEmail renders default logo', async () => {
+  it('FeedbackLinkedEmail renders no vendor logo', async () => {
     const html = await render(
       FeedbackLinkedEmail({
         postTitle: 'Test',
@@ -217,6 +218,6 @@ describe('email templates fall back to default logo when logoUrl not provided', 
         unsubscribeUrl: 'https://example.com/unsub',
       })
     )
-    expect(html).toContain(DEFAULT_LOGO_URL)
+    expect(html).not.toContain(VENDOR_LOGO)
   })
 })
