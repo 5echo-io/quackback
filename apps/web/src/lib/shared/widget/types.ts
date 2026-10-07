@@ -50,8 +50,18 @@ export interface WidgetInboundMessages {
         scope?: 'all' | 'support' | 'feedback'
       }
     | undefined
-  /** Host colours; see host-theme.ts. Hex only — anything else is cleared. */
-  'quackback:theme': { primary?: string; primaryForeground?: string } | null
+  /** Host colours and light/dark; see host-theme.ts. Hex only — anything else is cleared. */
+  'quackback:theme': {
+    primary?: string
+    primaryForeground?: string
+    background?: string
+    foreground?: string
+    card?: string
+    muted?: string
+    mutedForeground?: string
+    border?: string
+    mode?: 'light' | 'dark'
+  } | null
 }
 
 // ---- Iframe -> SDK Messages ----
