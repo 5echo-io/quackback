@@ -1,6 +1,7 @@
-import { Button, Heading, Link, Section, Text } from '@react-email/components'
+import { Heading, Section, Text } from '@react-email/components'
 import { EmailLayout, TransactionalFooter } from './email-layout'
-import { typography, button, utils } from './shared-styles'
+import { BrandButton, BrandLink } from './brand-elements'
+import { typography } from './shared-styles'
 
 interface InvitationEmailProps {
   invitedByName: string
@@ -18,33 +19,25 @@ export function InvitationEmail({
   logoUrl,
 }: InvitationEmailProps) {
   return (
-    <EmailLayout
-      preview={`Join ${organizationName} on Quackback`}
-      logoUrl={logoUrl}
-      logoAlt={organizationName}
-    >
+    <EmailLayout preview={`Join ${organizationName}`} logoUrl={logoUrl} logoAlt={organizationName}>
       {/* Content */}
       <Heading style={typography.h1}>
         {inviteeName ? `Hi ${inviteeName}, you're invited!` : "You're invited!"}
       </Heading>
       <Text style={typography.text}>
-        <strong>{invitedByName}</strong> has invited you to join <strong>{organizationName}</strong>{' '}
-        on Quackback.
+        <strong>{invitedByName}</strong> has invited you to join <strong>{organizationName}</strong>
+        .
       </Text>
 
       {/* CTA Button */}
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
-        <Button style={button.primary} href={inviteLink}>
-          Accept Invitation
-        </Button>
+        <BrandButton href={inviteLink}>Accept Invitation</BrandButton>
       </Section>
 
       {/* Fallback Link */}
       <Text style={typography.textSmall}>
         Or copy and paste this link into your browser:{' '}
-        <Link href={inviteLink} style={utils.link}>
-          {inviteLink}
-        </Link>
+        <BrandLink href={inviteLink}>{inviteLink}</BrandLink>
       </Text>
 
       {/* Footer */}

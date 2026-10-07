@@ -1,6 +1,7 @@
-import { Button, Heading, Hr, Section, Text } from '@react-email/components'
+import { Heading, Hr, Section, Text } from '@react-email/components'
 import { EmailLayout, TransactionalFooter } from './email-layout'
-import { typography, button, utils } from './shared-styles'
+import { BrandButton, BrandName } from './brand-elements'
+import { typography, utils, colors } from './shared-styles'
 
 interface MagicLinkEmailProps {
   signInUrl: string
@@ -20,18 +21,18 @@ interface MagicLinkEmailProps {
 export function MagicLinkEmail({ signInUrl, code, logoUrl }: MagicLinkEmailProps) {
   return (
     <EmailLayout preview="Your sign-in link" logoUrl={logoUrl}>
-      <Heading style={{ ...typography.h1, textAlign: 'center' }}>Sign in to Quackback</Heading>
+      <Heading style={{ ...typography.h1, textAlign: 'center' }}>
+        Sign in to <BrandName fallback="your account" />
+      </Heading>
       <Text style={{ ...typography.text, textAlign: 'center' }}>
         Click the button below to finish signing in.
       </Text>
 
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
-        <Button style={button.primary} href={signInUrl}>
-          Sign in
-        </Button>
+        <BrandButton href={signInUrl}>Sign in</BrandButton>
       </Section>
 
-      <Hr style={{ margin: '32px 0', borderColor: '#e5e7eb' }} />
+      <Hr style={{ margin: '32px 0', borderColor: colors.rule }} />
 
       <Text style={{ ...typography.text, textAlign: 'center' }}>
         Or enter this code on the sign-in screen:

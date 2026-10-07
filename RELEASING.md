@@ -81,8 +81,14 @@ triggers) **at the new tag**, not on upstream's `main`.
   a network. It has to stay, and this repository has to stay public.
 - Unused slug props removed after that change.
 - Opening a conversation from inbound email to a support address.
-- Widget: host colours (`quackback:theme`) and scoped doors (`scope` on
-  `quackback:open`), so one board can sit inside differently branded pages.
+- Widget: host colours, surfaces and light/dark (`quackback:theme`), and
+  scoped doors (`scope` on `quackback:open`), so one board can sit inside
+  differently branded pages. The mode is pinned on `<html>` and never written
+  to the theme cookie.
+- Widget identify keeps the principal's name and photo in step with the
+  token on every call, and a verified `avatarUrl: null` removes the photo.
+- Emails wear the board's own name, logo and light primary (resolved once per
+  send, `lib/server/email-brand.ts`), never Quackback's logo, colour or name.
 
 ## CI
 

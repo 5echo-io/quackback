@@ -1,6 +1,7 @@
-import { Button, Column, Heading, Row, Section, Text } from '@react-email/components'
+import { Column, Heading, Row, Section, Text } from '@react-email/components'
 import { EmailLayout, NotificationFooter } from './email-layout'
-import { typography, button, colors } from './shared-styles'
+import { AccentBar, BrandButton } from './brand-elements'
+import { typography, colors } from './shared-styles'
 
 interface ChatMessageEmailProps {
   heading: string
@@ -51,7 +52,7 @@ export function ChatMessageEmail({
           {senderName}
         </Text>
         <Row>
-          <Column style={{ width: '3px', backgroundColor: colors.primary, borderRadius: '2px' }} />
+          <AccentBar />
           <Column style={{ paddingLeft: '16px' }}>
             <Text
               style={{ ...typography.text, marginTop: '0', marginBottom: '0', fontStyle: 'italic' }}
@@ -63,9 +64,7 @@ export function ChatMessageEmail({
       </Section>
 
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
-        <Button style={button.primary} href={ctaUrl}>
-          {ctaLabel}
-        </Button>
+        <BrandButton href={ctaUrl}>{ctaLabel}</BrandButton>
       </Section>
 
       <NotificationFooter reason={reason} unsubscribeUrl={unsubscribeUrl ?? ctaUrl} />
