@@ -8,11 +8,13 @@
  */
 
 import { render } from '@react-email/components'
+import { createElement } from 'react'
 import nodemailer from 'nodemailer'
 import type { Transporter } from 'nodemailer'
 import { Resend } from 'resend'
 import { createLogger } from '@quackback/logger'
 import { isSyntheticAnonEmail } from './anon'
+import { EmailBrandProvider, resolveEmailBrand } from './brand'
 import { MagicLinkEmail } from './templates/magic-link'
 import { InvitationEmail } from './templates/invitation'
 import { PortalInviteEmail } from './templates/portal-invite'
@@ -152,9 +154,16 @@ async function sendEmail(options: {
   }
 
   const provider = getProvider()
+  if (provider === 'console') return { sent: false }
+
+  // The board's colour, name and logo, for every template in this email.
+  const react = createElement(EmailBrandProvider, {
+    brand: await resolveEmailBrand(),
+    children: options.react,
+  })
 
   if (provider === 'smtp') {
-    const html = await render(options.react)
+    const html = await render(react)
     try {
       const result = await getSmtpTransporter().sendMail({
         from: getEmailFrom(),
@@ -184,7 +193,7 @@ async function sendEmail(options: {
       from: getEmailFrom(),
       to: options.to,
       subject: options.subject,
-      react: options.react,
+      react,
       replyTo: options.replyTo,
     })
     if (result.error) {
@@ -198,7 +207,6 @@ async function sendEmail(options: {
     return { sent: true }
   }
 
-  // Console mode - caller handles logging
   return { sent: false }
 }
 
@@ -228,7 +236,7 @@ export async function sendInvitationEmail(params: SendInvitationParams): Promise
 
   return sendEmail({
     to,
-    subject: `You've been invited to join ${workspaceName} on Quackback`,
+    subject: `You've been invited to join ${workspaceName}`,
     react: InvitationEmail({
       invitedByName,
       inviteeName,
@@ -294,7 +302,7 @@ export async function sendWelcomeEmail(params: SendWelcomeParams): Promise<Email
 
   return sendEmail({
     to,
-    subject: `Welcome to ${workspaceName} on Quackback!`,
+    subject: `Welcome to ${workspaceName}!`,
     react: WelcomeEmail({ name, workspaceName, dashboardUrl, logoUrl }),
   })
 }
@@ -324,7 +332,7 @@ export async function sendMagicLinkEmail(params: SendMagicLinkParams): Promise<E
   log.debug('sending sign-in email')
   return sendEmail({
     to,
-    subject: 'Your Quackback sign-in link',
+    subject: 'Your sign-in link',
     react: MagicLinkEmail({ signInUrl, code, logoUrl }),
   })
 }
@@ -355,7 +363,7 @@ export async function sendPasswordResetEmail(
   log.debug('sending password reset email')
   return sendEmail({
     to,
-    subject: 'Reset your Quackback password',
+    subject: 'Reset your password',
     react: PasswordResetEmail({ resetLink, logoUrl }),
   })
 }
@@ -781,6 +789,7 @@ export async function sendFeedbackLinkedEmail(
 // Re-export templates for preview/testing
 // ============================================================================
 
+export { configureEmailBrand, DEFAULT_BRAND, type EmailBrand } from './brand'
 export { InvitationEmail } from './templates/invitation'
 export { PortalInviteEmail } from './templates/portal-invite'
 export { WelcomeEmail } from './templates/welcome'

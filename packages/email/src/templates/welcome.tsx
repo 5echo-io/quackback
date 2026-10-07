@@ -1,6 +1,7 @@
-import { Button, Column, Heading, Row, Section, Text } from '@react-email/components'
+import { Column, Heading, Row, Section, Text } from '@react-email/components'
 import { EmailLayout, TransactionalFooter } from './email-layout'
-import { typography, button, colors } from './shared-styles'
+import { BrandButton, BrandCheck } from './brand-elements'
+import { typography, colors } from './shared-styles'
 
 interface WelcomeEmailProps {
   name: string
@@ -11,13 +12,9 @@ interface WelcomeEmailProps {
 
 export function WelcomeEmail({ name, workspaceName, dashboardUrl, logoUrl }: WelcomeEmailProps) {
   return (
-    <EmailLayout
-      preview={`Welcome to ${workspaceName} on Quackback`}
-      logoUrl={logoUrl}
-      logoAlt={workspaceName}
-    >
+    <EmailLayout preview={`Welcome to ${workspaceName}`} logoUrl={logoUrl} logoAlt={workspaceName}>
       {/* Content */}
-      <Heading style={typography.h1}>Welcome to Quackback!</Heading>
+      <Heading style={typography.h1}>Welcome to {workspaceName}!</Heading>
       <Text style={typography.text}>
         Hi {name}, your workspace <strong>{workspaceName}</strong> is ready. Start collecting and
         managing customer feedback today.
@@ -33,7 +30,9 @@ export function WelcomeEmail({ name, workspaceName, dashboardUrl, logoUrl }: Wel
         ].map((feature) => (
           <Row key={feature} style={{ marginBottom: '4px' }}>
             <Column style={{ width: '28px', verticalAlign: 'top' }}>
-              <Text style={checkIcon}>&#10003;</Text>
+              <Text style={checkIcon}>
+                <BrandCheck />
+              </Text>
             </Column>
             <Column>
               <Text style={featureText}>{feature}</Text>
@@ -44,23 +43,20 @@ export function WelcomeEmail({ name, workspaceName, dashboardUrl, logoUrl }: Wel
 
       {/* CTA Button */}
       <Section style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <Button style={button.primary} href={dashboardUrl}>
-          Go to Dashboard
-        </Button>
+        <BrandButton href={dashboardUrl}>Go to Dashboard</BrandButton>
       </Section>
 
       {/* Footer */}
       <TransactionalFooter>
         Happy collecting!
         <br />
-        The Quackback Team
+        The {workspaceName} team
       </TransactionalFooter>
     </EmailLayout>
   )
 }
 
 const checkIcon = {
-  color: colors.primary,
   fontSize: '15px',
   fontWeight: '700' as const,
   lineHeight: '28px',

@@ -22,6 +22,13 @@ if (process.env.SECRET_KEY) {
   })
 }
 
+// Emails wear this board's name, logo and colour rather than the vendor's —
+// see packages/email/src/brand.tsx. Lazy on both ends, like the warmup above:
+// the resolver is only imported when the first email goes out.
+void import('@quackback/email').then(({ configureEmailBrand }) =>
+  configureEmailBrand(() => import('@/lib/server/email-brand').then((m) => m.getEmailBrand()))
+)
+
 logStartupBanner()
 
 export default createServerEntry({

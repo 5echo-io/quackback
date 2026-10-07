@@ -1,6 +1,7 @@
-import { Button, Heading, Link, Section, Text } from '@react-email/components'
+import { Heading, Section, Text } from '@react-email/components'
 import { EmailLayout, TransactionalFooter } from './email-layout'
-import { typography, button, utils } from './shared-styles'
+import { BrandButton, BrandLink } from './brand-elements'
+import { typography } from './shared-styles'
 
 interface PasswordResetEmailProps {
   resetLink: string
@@ -9,7 +10,7 @@ interface PasswordResetEmailProps {
 
 export function PasswordResetEmail({ resetLink, logoUrl }: PasswordResetEmailProps) {
   return (
-    <EmailLayout preview="Reset your Quackback password" logoUrl={logoUrl}>
+    <EmailLayout preview="Reset your password" logoUrl={logoUrl}>
       {/* Content */}
       <Heading style={{ ...typography.h1, textAlign: 'center' }}>Reset your password</Heading>
       <Text style={{ ...typography.text, textAlign: 'center' }}>
@@ -18,17 +19,13 @@ export function PasswordResetEmail({ resetLink, logoUrl }: PasswordResetEmailPro
 
       {/* CTA Button */}
       <Section style={{ textAlign: 'center', marginTop: '32px', marginBottom: '32px' }}>
-        <Button style={button.primary} href={resetLink}>
-          Reset Password
-        </Button>
+        <BrandButton href={resetLink}>Reset Password</BrandButton>
       </Section>
 
       {/* Fallback Link */}
       <Text style={typography.textSmall}>
         Or copy and paste this link into your browser:{' '}
-        <Link href={resetLink} style={utils.link}>
-          {resetLink}
-        </Link>
+        <BrandLink href={resetLink}>{resetLink}</BrandLink>
       </Text>
 
       {/* Footer */}

@@ -60,6 +60,22 @@ export const RESERVED_JWT_CLAIMS = new Set([
   'jti',
 ])
 
+/**
+ * The photo a set of claims asks for: a URL sets it, absence leaves it alone,
+ * and an explicit `null` removes it — on a verified token only, since a host
+ * that signs its claims is the one that knows the person has no photo now.
+ * Without the third case a removed photo stayed on the board for good.
+ */
+export function avatarFromClaims(
+  claims: Record<string, unknown>,
+  verified: boolean
+): string | null | undefined {
+  if (typeof claims.avatarURL === 'string') return claims.avatarURL
+  if (typeof claims.avatarUrl === 'string') return claims.avatarUrl
+  if (verified && (claims.avatarURL === null || claims.avatarUrl === null)) return null
+  return undefined
+}
+
 /** Extract non-reserved claims from a verified JWT payload for attribute processing */
 export function extractCustomClaims(payload: Record<string, unknown>): Record<string, unknown> {
   const custom: Record<string, unknown> = {}
@@ -137,7 +153,8 @@ interface IdentifiedUser {
   id: string
   email: string
   name?: string
-  avatarURL?: string
+  /** A URL sets the photo, null removes it, undefined leaves it. */
+  avatarURL?: string | null
 }
 
 export const Route = createFileRoute('/api/widget/identify')({
@@ -213,12 +230,7 @@ export const Route = createFileRoute('/api/widget/identify')({
           id: sub,
           email,
           name: typeof claims.name === 'string' ? claims.name : undefined,
-          avatarURL:
-            typeof claims.avatarURL === 'string'
-              ? claims.avatarURL
-              : typeof claims.avatarUrl === 'string'
-                ? claims.avatarUrl
-                : undefined,
+          avatarURL: avatarFromClaims(claims, claimsAreVerified),
         }
 
         // Extract custom attributes (silently drop unknown/invalid)
@@ -279,9 +291,9 @@ export const Route = createFileRoute('/api/widget/identify')({
         const country = captureCountryFromHeaders(request.headers)
 
         if (userRecord) {
-          const updates: Record<string, string> = {}
+          const updates: Record<string, string | null> = {}
           if (identified.name && identified.name !== userRecord.name) updates.name = identified.name
-          if (identified.avatarURL && identified.avatarURL !== userRecord.image)
+          if (identified.avatarURL !== undefined && identified.avatarURL !== userRecord.image)
             updates.image = identified.avatarURL
           if (hasAttrs) {
             updates.metadata = mergeMetadata(userRecord.metadata ?? null, validAttrs, [])
@@ -309,6 +321,10 @@ export const Route = createFileRoute('/api/widget/identify')({
 
           if (Object.keys(updates).length > 0) {
             await db.update(user).set(updates).where(eq(user.id, userRecord.id))
+            // Everything below reads the profile off this record — the
+            // principal sync and the response — so it has to be what was
+            // just written, not what was there before.
+            userRecord = { ...userRecord, ...updates } as typeof userRecord
           }
         } else {
           const [created] = await db
@@ -353,6 +369,20 @@ export const Route = createFileRoute('/api/widget/identify')({
             })
             .returning()
           principalRecord = created
+        } else if (
+          principalRecord.displayName !== userRecord.name ||
+          (principalRecord.avatarUrl ?? null) !== (userRecord.image ?? null)
+        ) {
+          // Posts, comments, voters and the avatar map read the principal,
+          // not the user row. It used to be written once, at creation, so a
+          // photo or name changed in the host app reached the widget header
+          // and nothing else. Reconciled against the user row rather than
+          // this request's diff, so a principal that drifted earlier is
+          // repaired on the next identify too. An uploaded avatarKey still
+          // outranks the URL wherever it is shown.
+          const profile = { displayName: userRecord.name, avatarUrl: userRecord.image ?? null }
+          await db.update(principal).set(profile).where(eq(principal.id, principalRecord.id))
+          principalRecord = { ...principalRecord, ...profile }
         }
 
         const principalId = principalRecord.id as PrincipalId
