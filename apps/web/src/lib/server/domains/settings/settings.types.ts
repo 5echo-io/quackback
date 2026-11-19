@@ -579,6 +579,12 @@ export interface HelpCenterConfig {
   homepageTitle: string
   homepageDescription: string
   seo: HelpCenterSeoConfig
+  /** The languages articles may be written in, and the switcher offers.
+   *  Portal locale ids. One language means no switcher at all. */
+  locales: string[]
+  /** The language an article is shown in when the reader's own has no
+   *  translation, and the language of a category's base name. */
+  defaultLocale: string
 }
 
 export const DEFAULT_HELP_CENTER_CONFIG: HelpCenterConfig = {
@@ -586,6 +592,8 @@ export const DEFAULT_HELP_CENTER_CONFIG: HelpCenterConfig = {
   homepageTitle: 'How can we help?',
   homepageDescription: 'Search our knowledge base or browse by category',
   seo: DEFAULT_HELP_CENTER_SEO_CONFIG,
+  locales: ['en'],
+  defaultLocale: 'en',
 }
 
 // =============================================================================

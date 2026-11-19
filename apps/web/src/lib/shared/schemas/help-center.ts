@@ -6,6 +6,26 @@
 
 import { z } from 'zod'
 import { tiptapContentSchema } from './posts'
+import { SUPPORTED_LOCALES } from '@/lib/shared/i18n'
+
+/** A help-center content language: one of the portal's locale ids. */
+export const helpCenterLocaleSchema = z.enum(SUPPORTED_LOCALES)
+
+/** A category's name and description in each language other than the default. */
+export const categoryTranslationsSchema = z.partialRecord(
+  helpCenterLocaleSchema,
+  z.object({
+    name: z.string().min(1).max(200),
+    description: z.string().max(2000).nullable().optional(),
+  })
+)
+
+/** Shared by an article and its translations. */
+export const translationGroupSchema = z
+  .string()
+  .min(1)
+  .max(120)
+  .regex(/^[a-z0-9][a-z0-9._-]*$/, 'Lowercase letters, digits, dots, dashes and underscores')
 
 // ============================================================================
 // Category Schemas
@@ -23,6 +43,7 @@ export const createCategorySchema = z.object({
   position: z.number().int().min(0).optional(),
   parentId: z.string().nullable().optional(),
   icon: z.string().max(50).nullable().optional(),
+  translations: categoryTranslationsSchema.optional(),
 })
 
 export const updateCategorySchema = z.object({
@@ -34,6 +55,7 @@ export const updateCategorySchema = z.object({
   position: z.number().int().min(0).optional(),
   parentId: z.string().nullable().optional(),
   icon: z.string().max(50).nullable().optional(),
+  translations: categoryTranslationsSchema.optional(),
 })
 
 export const getCategorySchema = z.object({
@@ -56,6 +78,8 @@ export const createArticleSchema = z.object({
   slug: z.string().max(200).optional(),
   position: z.number().int().optional(),
   description: z.string().max(300).optional(),
+  locale: helpCenterLocaleSchema.optional(),
+  translationGroup: translationGroupSchema.nullable().optional(),
 })
 
 export const updateArticleSchema = z.object({
@@ -67,6 +91,8 @@ export const updateArticleSchema = z.object({
   slug: z.string().max(200).optional(),
   position: z.number().int().optional(),
   description: z.string().max(300).optional(),
+  locale: helpCenterLocaleSchema.optional(),
+  translationGroup: translationGroupSchema.nullable().optional(),
 })
 
 export const getArticleSchema = z.object({
@@ -85,6 +111,7 @@ export const listArticlesSchema = z.object({
   limit: z.number().int().positive().max(100).optional(),
   showDeleted: z.boolean().optional(),
   sort: z.enum(['newest', 'oldest']).optional(),
+  locale: helpCenterLocaleSchema.optional(),
 })
 
 export const listPublicArticlesSchema = z.object({
@@ -127,11 +154,18 @@ export const restoreArticleSchema = z.object({
 // Help Center Config Schemas
 // ============================================================================
 
-export const updateHelpCenterConfigSchema = z.object({
-  enabled: z.boolean().optional(),
-  homepageTitle: z.string().min(1).max(200).optional(),
-  homepageDescription: z.string().max(500).optional(),
-})
+export const updateHelpCenterConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    homepageTitle: z.string().min(1).max(200).optional(),
+    homepageDescription: z.string().max(500).optional(),
+    locales: z.array(helpCenterLocaleSchema).min(1).optional(),
+    defaultLocale: helpCenterLocaleSchema.optional(),
+  })
+  .refine(
+    (data) => !data.locales || !data.defaultLocale || data.locales.includes(data.defaultLocale),
+    { message: 'The default language must be one of the languages', path: ['defaultLocale'] }
+  )
 
 export const updateHelpCenterSeoSchema = z.object({
   metaDescription: z.string().max(500).optional(),

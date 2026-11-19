@@ -75,6 +75,8 @@ describe('HelpCenterConfig', () => {
           structuredDataEnabled: true,
           ogImageKey: null,
         },
+        locales: ['en', 'nb'],
+        defaultLocale: 'en',
       }
       expect(config.enabled).toBe(true)
     })

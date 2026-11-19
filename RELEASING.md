@@ -89,6 +89,16 @@ triggers) **at the new tag**, not on upstream's `main`.
   token on every call, and a verified `avatarUrl: null` removes the photo.
 - Emails wear the board's own name, logo and light primary (resolved once per
   send, `lib/server/email-brand.ts`), never Quackback's logo, colour or name.
+- The help center in more than one language. An article has a `locale` and a
+  `translationGroup` shared with its translations (migration 0126); a category
+  has names per language; Settings → Help Center chooses the languages and the
+  default. A reader gets their language by one rule (`?lang=`, the `qb_locale`
+  cookie, `Accept-Language`), falls back to the default where an article has
+  no translation, and switches with a menu of plain `?lang=` links. Each
+  article's search vector stems in its own language. The portal speaks
+  Norwegian (`nb`, which `no` and `nn` also reach), Swedish and Danish, and the
+  help center's own texts, which upstream had hard-coded in English, are
+  messages.
 
 ## CI
 

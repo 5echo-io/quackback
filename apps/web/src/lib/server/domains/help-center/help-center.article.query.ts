@@ -21,13 +21,20 @@ import type {
   HelpCenterArticleWithCategory,
   ListArticlesParams,
   ArticleListResult,
+  ArticleTranslation,
 } from './help-center.types'
+import { articleMatches, readableIn, type ReaderLocale } from './help-center.locale'
 
 // ============================================================================
 // Article Queries
 // ============================================================================
 
-export async function listArticles(params: ListArticlesParams): Promise<ArticleListResult> {
+export async function listArticles(
+  params: ListArticlesParams & {
+    /** Show only what this reader is shown (their language, or the default's). */
+    reader?: ReaderLocale
+  }
+): Promise<ArticleListResult> {
   const {
     categoryId,
     status = 'all',
@@ -36,6 +43,8 @@ export async function listArticles(params: ListArticlesParams): Promise<ArticleL
     limit = 20,
     showDeleted = false,
     sort = 'newest',
+    locale,
+    reader,
   } = params
   const now = new Date()
 
@@ -61,10 +70,16 @@ export async function listArticles(params: ListArticlesParams): Promise<ArticleL
     }
   }
 
+  if (locale) {
+    conditions.push(eq(helpCenterArticles.locale, locale))
+  }
+
+  if (reader) {
+    conditions.push(readableIn(reader))
+  }
+
   if (search?.trim()) {
-    conditions.push(
-      sql`${helpCenterArticles.searchVector} @@ websearch_to_tsquery('english', ${search.trim()})`
-    )
+    conditions.push(articleMatches(search.trim()))
   }
 
   if (cursor) {
@@ -112,6 +127,8 @@ export async function listArticles(params: ListArticlesParams): Promise<ArticleL
       id: true,
       categoryId: true,
       slug: true,
+      locale: true,
+      translationGroup: true,
       title: true,
       description: true,
       position: true,
@@ -183,11 +200,42 @@ export async function listPublicArticles(params: {
   search?: string
   cursor?: string
   limit?: number
+  reader?: ReaderLocale
 }): Promise<ArticleListResult> {
   return listArticles({ ...params, status: 'published' })
 }
 
-export async function listPublicArticlesForCategory(categoryId: string) {
+/**
+ * The published translations of an article's group, the article itself
+ * included, for the language switcher. Only public, live ones.
+ */
+export async function listPublishedTranslations(
+  translationGroup: string | null
+): Promise<ArticleTranslation[]> {
+  if (!translationGroup) return []
+  return db
+    .select({
+      locale: helpCenterArticles.locale,
+      slug: helpCenterArticles.slug,
+      title: helpCenterArticles.title,
+      categorySlug: helpCenterCategories.slug,
+    })
+    .from(helpCenterArticles)
+    .innerJoin(helpCenterCategories, eq(helpCenterCategories.id, helpCenterArticles.categoryId))
+    .where(
+      and(
+        eq(helpCenterArticles.translationGroup, translationGroup),
+        isNotNull(helpCenterArticles.publishedAt),
+        lte(helpCenterArticles.publishedAt, new Date()),
+        isNull(helpCenterArticles.deletedAt),
+        isNull(helpCenterCategories.deletedAt),
+        eq(helpCenterCategories.isPublic, true)
+      )
+    )
+    .orderBy(asc(helpCenterArticles.locale))
+}
+
+export async function listPublicArticlesForCategory(categoryId: string, reader?: ReaderLocale) {
   // Join category so we can enforce isPublic + non-deleted on the
   // category side. Without these checks, an admin marking a category
   // private only hid it from the public nav — direct category-id
@@ -197,6 +245,7 @@ export async function listPublicArticlesForCategory(categoryId: string) {
     .select({
       id: helpCenterArticles.id,
       slug: helpCenterArticles.slug,
+      locale: helpCenterArticles.locale,
       title: helpCenterArticles.title,
       description: helpCenterArticles.description,
       position: helpCenterArticles.position,
@@ -215,7 +264,8 @@ export async function listPublicArticlesForCategory(categoryId: string) {
         lte(helpCenterArticles.publishedAt, new Date()),
         isNull(helpCenterArticles.deletedAt),
         isNull(helpCenterCategories.deletedAt),
-        eq(helpCenterCategories.isPublic, true)
+        eq(helpCenterCategories.isPublic, true),
+        ...(reader ? [readableIn(reader)] : [])
       )
     )
     .orderBy(asc(helpCenterArticles.position), asc(helpCenterArticles.publishedAt))

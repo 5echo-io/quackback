@@ -1,17 +1,17 @@
 import { createServerFn } from '@tanstack/react-start'
-import { resolveLocale, loadMessages, type SupportedLocale } from '@/lib/shared/i18n'
+import { loadMessages, type SupportedLocale } from '@/lib/shared/i18n'
 
 /**
- * Resolve the portal locale from the request's Accept-Language header.
+ * Resolve the portal locale for the request: `?lang=`, then the locale cookie,
+ * then the Accept-Language header (visitorLocaleForRequest).
  *
  * Shared by the standalone `/auth/*` routes so they render under the same
  * `PortalIntlProvider` the in-portal pages get from `_portal.tsx` — without
  * it `useIntl`/`<FormattedMessage>` in the auth forms would have no provider.
  */
 export const getPortalLocaleFn = createServerFn({ method: 'GET' }).handler(async () => {
-  const { getRequestHeaders } = await import('@tanstack/react-start/server')
-  const acceptLanguage = getRequestHeaders().get('accept-language')
-  return resolveLocale(acceptLanguage)
+  const { visitorLocaleForRequest } = await import('@/lib/server/visitor-locale')
+  return visitorLocaleForRequest()
 })
 
 /**

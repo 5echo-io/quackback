@@ -14,4 +14,5 @@ export type {
   UpdateArticleInput,
   ListArticlesParams,
   ArticleListResult,
+  ArticleTranslation,
 } from './help-center.types'

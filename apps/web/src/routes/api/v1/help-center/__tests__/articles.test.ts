@@ -59,12 +59,16 @@ import { Route as ArticlesListRoute } from '../articles/index'
 import { Route as ArticleDetailRoute } from '../articles/$articleId'
 import { Route as ArticleFeedbackRoute } from '../articles/$articleId.feedback'
 
-type MockedHandler = (ctx: { request: Request; params?: Record<string, string> }) => Promise<Response>
+type MockedHandler = (ctx: {
+  request: Request
+  params?: Record<string, string>
+}) => Promise<Response>
 type MockedRouteShape = { options: { server: { handlers: Record<string, MockedHandler> } } }
 
 const listHandlers = (ArticlesListRoute as unknown as MockedRouteShape).options.server.handlers
 const detailHandlers = (ArticleDetailRoute as unknown as MockedRouteShape).options.server.handlers
-const feedbackHandlers = (ArticleFeedbackRoute as unknown as MockedRouteShape).options.server.handlers
+const feedbackHandlers = (ArticleFeedbackRoute as unknown as MockedRouteShape).options.server
+  .handlers
 
 // --- Helpers ---
 
@@ -97,6 +101,8 @@ const mockArticle: HelpCenterArticleWithCategory = {
   id: 'article_1' as HelpCenterArticleId,
   categoryId: 'category_1' as HelpCenterCategoryId,
   slug: 'how-to-start',
+  locale: 'en',
+  translationGroup: null,
   title: 'How to Get Started',
   description: null,
   position: null,
@@ -110,7 +116,11 @@ const mockArticle: HelpCenterArticleWithCategory = {
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-10'),
   deletedAt: null,
-  category: { id: 'category_1' as HelpCenterCategoryId, slug: 'getting-started', name: 'Getting Started' },
+  category: {
+    id: 'category_1' as HelpCenterCategoryId,
+    slug: 'getting-started',
+    name: 'Getting Started',
+  },
   author: { id: 'principal_1' as PrincipalId, name: 'Admin', avatarUrl: null },
 }
 
@@ -364,7 +374,10 @@ describe('PATCH /api/v1/help-center/articles/:id', () => {
   })
 
   it('reassigns author when authorId is provided', async () => {
-    const updatedArticle = { ...mockArticle, author: { id: 'principal_2' as PrincipalId, name: 'Other', avatarUrl: null } }
+    const updatedArticle = {
+      ...mockArticle,
+      author: { id: 'principal_2' as PrincipalId, name: 'Other', avatarUrl: null },
+    }
     vi.mocked(updateArticle).mockResolvedValue(updatedArticle)
     vi.mocked(parseOptionalTypeId).mockReturnValue('principal_2' as PrincipalId)
 

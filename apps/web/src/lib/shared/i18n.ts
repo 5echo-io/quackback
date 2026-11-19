@@ -10,11 +10,47 @@ export const SUPPORTED_LOCALES = [
   'pt-br',
   'zh-cn',
   'zh-tw',
+  'nb',
+  'sv',
+  'da',
 ] as const
 
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
 
 const RTL_LOCALES = new Set(['ar', 'he', 'fa', 'ur'])
+
+/**
+ * Each locale's name in its own language, for a language switcher. Never
+ * translated: a reader looking for their language finds it by its own name.
+ */
+export const LOCALE_AUTONYMS: Record<SupportedLocale, string> = {
+  en: 'English',
+  de: 'Deutsch',
+  fr: 'Français',
+  es: 'Español',
+  ar: 'العربية',
+  ru: 'Русский',
+  'pt-br': 'Português (Brasil)',
+  'zh-cn': '简体中文',
+  'zh-tw': '繁體中文',
+  nb: 'Norsk',
+  sv: 'Svenska',
+  da: 'Dansk',
+}
+
+/** The cookie that holds a visitor's chosen locale, set by `?lang=` or the switcher. */
+export const LOCALE_COOKIE = 'qb_locale'
+
+/** A year: a language choice is a preference, not a session. */
+export const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+
+// Norwegian has three tags in the wild: `nb` (Bokmål), `nn` (Nynorsk) and the
+// macrolanguage `no`. Browsers send any of them; the catalog is Bokmål, which
+// every Norwegian reader reads, so all three land there.
+const LOCALE_ALIASES: Record<string, SupportedLocale> = {
+  no: 'nb',
+  nn: 'nb',
+}
 
 /**
  * Normalizes a locale string to a supported locale, stripping region subtags
@@ -32,6 +68,8 @@ export function normalizeLocale(locale: string): SupportedLocale | null {
 
   // Strip region subtag (e.g. "fr-FR" -> "fr"), but only accept 2-letter base codes
   const parts = lower.split('-')
+
+  if (LOCALE_ALIASES[parts[0]]) return LOCALE_ALIASES[parts[0]]
 
   // Chinese is script-sensitive: Simplified (zh-cn) and Traditional (zh-tw) are
   // separate catalogs, so the generic "strip to base" rule below would wrongly
@@ -96,6 +134,42 @@ export function resolveLocale(
   }
 
   return DEFAULT_LOCALE
+}
+
+/**
+ * The locale a visitor chose (`?lang=` or the switcher), read from a raw
+ * `Cookie` header. null when there is none or it names no supported locale.
+ */
+export function localeFromCookie(cookieHeader: string | null | undefined): SupportedLocale | null {
+  if (!cookieHeader) return null
+  for (const part of cookieHeader.split(';')) {
+    const [name, ...rest] = part.trim().split('=')
+    if (name === LOCALE_COOKIE) {
+      try {
+        return normalizeLocale(decodeURIComponent(rest.join('=')))
+      } catch {
+        return null
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * The visitor's locale, by one rule everywhere: an explicit choice for this
+ * request (`?lang=`), then the one they chose before (the cookie), then the
+ * browser's `Accept-Language`, then the default.
+ */
+export function resolveVisitorLocale(input: {
+  explicit?: string | null
+  cookieHeader?: string | null
+  acceptLanguage?: string | null
+}): SupportedLocale {
+  const explicit = input.explicit ? normalizeLocale(input.explicit) : null
+  if (explicit) return explicit
+  const chosen = localeFromCookie(input.cookieHeader)
+  if (chosen) return chosen
+  return resolveLocale(input.acceptLanguage)
 }
 
 /**

@@ -38,6 +38,8 @@
  */
 
 import { z } from 'zod'
+import { helpCenterLocaleSchema, translationGroupSchema } from '@/lib/shared/schemas/help-center'
+import type { SupportedLocale } from '@/lib/shared/i18n'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js'
 import { listInboxPosts } from '@/lib/server/domains/posts/post.inbox'
@@ -216,6 +218,8 @@ function agentFromMcpAuth(auth: McpAuthContext) {
 function articleResult(article: {
   id: string
   slug: string
+  locale: string
+  translationGroup: string | null
   title: string
   content: string
   contentJson: TiptapContent | null
@@ -233,6 +237,8 @@ function articleResult(article: {
   return jsonResult({
     id: article.id,
     slug: article.slug,
+    locale: article.locale,
+    translationGroup: article.translationGroup,
     title: article.title,
     content: contentJsonToMarkdown(article.contentJson, article.content),
     description: article.description,
@@ -581,6 +587,17 @@ const createHelpCenterArticleSchema = {
     .string()
     .optional()
     .describe('Principal TypeID of the article author (defaults to the authenticated caller)'),
+  locale: helpCenterLocaleSchema
+    .optional()
+    .describe(
+      'Language the article is written in, a portal locale id such as "en", "nb", "sv" or "da". Must be one of the help center\'s languages; defaults to its default language.'
+    ),
+  translationGroup: translationGroupSchema
+    .nullable()
+    .optional()
+    .describe(
+      'Key shared by an article and its translations, one article per language (e.g. "getting-started"). The help center links translations by it.'
+    ),
 }
 
 const updateHelpCenterArticleSchema = {
@@ -605,6 +622,17 @@ const updateHelpCenterArticleSchema = {
       'Any ISO 8601 datetime string to publish immediately (e.g. "2026-04-08T00:00:00Z"), or null to unpublish. The exact timestamp is not used — articles are always published at the current time.'
     ),
   authorId: z.string().optional().describe('Principal TypeID to reassign as the article author'),
+  locale: helpCenterLocaleSchema
+    .optional()
+    .describe(
+      'Language the article is written in, a portal locale id such as "en", "nb", "sv" or "da". Must be one of the help center\'s languages; defaults to its default language.'
+    ),
+  translationGroup: translationGroupSchema
+    .nullable()
+    .optional()
+    .describe(
+      'Key shared by an article and its translations, one article per language (e.g. "getting-started"). The help center links translations by it.'
+    ),
 }
 
 const deleteHelpCenterArticleSchema = {
@@ -762,6 +790,8 @@ type CreateHelpCenterArticleArgs = {
   slug?: string
   description?: string
   authorId?: string
+  locale?: SupportedLocale
+  translationGroup?: string | null
 }
 
 type UpdateHelpCenterArticleArgs = {
@@ -773,6 +803,8 @@ type UpdateHelpCenterArticleArgs = {
   categoryId?: string
   publishedAt?: string | null
   authorId?: string
+  locale?: SupportedLocale
+  translationGroup?: string | null
 }
 
 type DeleteHelpCenterArticleArgs = { articleId: string }
@@ -1868,6 +1900,8 @@ Examples:
             content: args.content,
             slug: args.slug,
             description: args.description,
+            locale: args.locale,
+            translationGroup: args.translationGroup,
           },
           auth.principalId,
           authorPrincipalId
@@ -2453,6 +2487,8 @@ async function searchArticles(args: SearchArgs): Promise<CallToolResult> {
     articles: result.items.map((a) => ({
       id: a.id,
       slug: a.slug,
+      locale: a.locale,
+      translationGroup: a.translationGroup,
       title: a.title,
       excerpt: a.content ? truncate(a.content, 200) : '',
       description: a.description,

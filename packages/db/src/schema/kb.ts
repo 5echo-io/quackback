@@ -21,6 +21,33 @@ const tsvector = customType<{ data: string }>({
   },
 })
 
+/**
+ * The text-search dictionary for an article's language, as SQL over its
+ * `locale` column. Migration 0126 builds the search vector with exactly this
+ * CASE, and searchConfigForLocale() in the app picks the same dictionary for
+ * the query side.
+ */
+const localeSearchConfig = sql.raw(`CASE "locale"
+    WHEN 'nb' THEN 'norwegian'::regconfig
+    WHEN 'sv' THEN 'swedish'::regconfig
+    WHEN 'da' THEN 'danish'::regconfig
+    WHEN 'de' THEN 'german'::regconfig
+    WHEN 'fr' THEN 'french'::regconfig
+    WHEN 'es' THEN 'spanish'::regconfig
+    WHEN 'ru' THEN 'russian'::regconfig
+    WHEN 'pt-br' THEN 'portuguese'::regconfig
+    WHEN 'ar' THEN 'arabic'::regconfig
+    WHEN 'zh-cn' THEN 'simple'::regconfig
+    WHEN 'zh-tw' THEN 'simple'::regconfig
+    ELSE 'english'::regconfig
+  END`)
+
+/** A category's name and description in one language. */
+export interface HelpCenterCategoryTranslation {
+  name: string
+  description?: string | null
+}
+
 const vector = customType<{ data: number[] }>({
   dataType() {
     return 'vector(1536)'
@@ -45,6 +72,12 @@ export const helpCenterCategories = pgTable(
     icon: text('icon'),
     isPublic: boolean('is_public').default(true).notNull(),
     position: integer('position').default(0).notNull(),
+    /** Name and description per language, keyed by locale. The base columns
+     *  are the help center's default language. */
+    translations: jsonb('translations')
+      .$type<Record<string, HelpCenterCategoryTranslation>>()
+      .default({})
+      .notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -69,6 +102,10 @@ export const helpCenterArticles = pgTable(
       .notNull()
       .references(() => helpCenterCategories.id, { onDelete: 'cascade' }),
     slug: text('slug').notNull(),
+    /** The language the article is written in, a portal locale id. */
+    locale: text('locale').default('en').notNull(),
+    /** Shared by an article and its translations; at most one per locale. */
+    translationGroup: text('translation_group'),
     title: text('title').notNull(),
     description: text('description'),
     position: integer('position'),
@@ -82,7 +119,7 @@ export const helpCenterArticles = pgTable(
     helpfulCount: integer('helpful_count').default(0).notNull(),
     notHelpfulCount: integer('not_helpful_count').default(0).notNull(),
     searchVector: tsvector('search_vector').generatedAlwaysAs(
-      sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || setweight(to_tsvector('english', coalesce(content, '')), 'B')`
+      sql`setweight(to_tsvector(${localeSearchConfig}, coalesce(title, '')), 'A') || setweight(to_tsvector(${localeSearchConfig}, coalesce(content, '')), 'B')`
     ),
     embedding: vector('embedding'),
     embeddingModel: text('embedding_model'),
@@ -100,6 +137,10 @@ export const helpCenterArticles = pgTable(
     index('kb_articles_category_published_idx').on(table.categoryId, table.publishedAt),
     index('kb_articles_category_position_idx').on(table.categoryId, table.position),
     index('kb_articles_search_vector_idx').using('gin', table.searchVector),
+    index('kb_articles_locale_idx').on(table.locale),
+    uniqueIndex('kb_articles_translation_locale_idx')
+      .on(table.translationGroup, table.locale)
+      .where(sql`${table.translationGroup} IS NOT NULL AND ${table.deletedAt} IS NULL`),
   ]
 )
 

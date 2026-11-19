@@ -27,6 +27,8 @@ export interface HelpCenterCategory {
   icon: string | null
   isPublic: boolean
   position: number
+  /** Name and description per language other than the default. */
+  translations: Record<string, { name: string; description?: string | null }>
   createdAt: Date
   updatedAt: Date
   deletedAt?: Date | null
@@ -51,6 +53,10 @@ export interface HelpCenterArticle {
   id: HelpCenterArticleId
   categoryId: HelpCenterCategoryId
   slug: string
+  /** The language the article is written in. */
+  locale: string
+  /** Shared with the article's translations; null when it has none. */
+  translationGroup: string | null
   title: string
   description: string | null
   position: number | null
@@ -82,6 +88,14 @@ export interface HelpCenterArticleWithCategory extends HelpCenterArticle {
 // ============================================================================
 // List/Search Types
 // ============================================================================
+
+/** A published translation of an article, for the language switcher. */
+export interface ArticleTranslation {
+  locale: string
+  slug: string
+  title: string
+  categorySlug: string
+}
 
 export interface ArticleListResult {
   items: HelpCenterArticleWithCategory[]

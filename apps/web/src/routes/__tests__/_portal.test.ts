@@ -31,7 +31,10 @@ vi.mock('@/lib/server/domains/settings/redact', () => ({
 vi.mock('@/lib/shared/theme', () => ({
   generateThemeCSS: vi.fn(() => ''),
 }))
-vi.mock('@/lib/shared/i18n', () => ({ resolveLocale: vi.fn(async () => 'en') }))
+vi.mock('@/lib/shared/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/shared/i18n')>()),
+  resolveLocale: vi.fn(async () => 'en'),
+}))
 vi.mock('@/lib/shared/types/settings', () => ({
   DEFAULT_PORTAL_CONFIG: { oauth: {}, access: {} },
   DEFAULT_AUTH_CONFIG: { oauth: { google: true, github: true, password: true }, openSignup: false },

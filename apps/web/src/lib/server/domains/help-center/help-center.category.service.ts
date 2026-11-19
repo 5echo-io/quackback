@@ -28,6 +28,8 @@ import {
   getSubtreeMaxDepth,
 } from './category-tree'
 import { logger } from '@/lib/server/logger'
+import { localizedCategory } from '@/lib/shared/help-center-locale'
+import { readableIn, type ReaderLocale } from './help-center.locale'
 
 const log = logger.child({ component: 'help-center-categories' })
 
@@ -93,9 +95,14 @@ function validateHierarchyConstraint(params: {
 }
 
 export async function listCategories(
-  options: { showDeleted?: boolean } = {}
+  options: {
+    showDeleted?: boolean
+    /** Count only the published articles this reader is shown. */
+    reader?: ReaderLocale
+  } = {}
 ): Promise<HelpCenterCategoryWithCount[]> {
-  const { showDeleted = false } = options
+  const { showDeleted = false, reader } = options
+  const readable = reader ? sql` and ${readableIn(reader)}` : sql``
   const now = new Date()
   const nowIso = now.toISOString()
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -133,7 +140,7 @@ export async function listCategories(
             categoryId: helpCenterArticles.categoryId,
             totalCount: sql<number>`count(*)::int`.as('total_count'),
             publishedCount:
-              sql<number>`count(*) filter (where ${helpCenterArticles.publishedAt} is not null and ${helpCenterArticles.publishedAt} <= ${nowIso})::int`.as(
+              sql<number>`count(*) filter (where ${helpCenterArticles.publishedAt} is not null and ${helpCenterArticles.publishedAt} <= ${nowIso}${readable})::int`.as(
                 'published_count'
               ),
           })
@@ -168,11 +175,21 @@ export async function listCategories(
   })
 }
 
-export async function listPublicCategories(): Promise<HelpCenterCategoryWithCount[]> {
-  const all = await listCategories()
+/**
+ * The categories a reader sees, named in their language, with the count of
+ * articles they are shown. A category with nothing for this reader is left
+ * out, as an empty one always was.
+ */
+export async function listPublicCategories(
+  reader?: ReaderLocale
+): Promise<HelpCenterCategoryWithCount[]> {
+  const all = await listCategories({ reader })
   return all
     .filter((cat) => cat.isPublic && cat.recursivePublishedArticleCount > 0)
-    .map((cat) => ({ ...cat, articleCount: cat.recursivePublishedArticleCount }))
+    .map((cat) => ({
+      ...localizedCategory(cat, reader?.locale),
+      articleCount: cat.recursivePublishedArticleCount,
+    }))
 }
 
 export async function getCategoryById(id: HelpCenterCategoryId): Promise<HelpCenterCategory> {
@@ -201,7 +218,10 @@ export async function getCategoryBySlug(slug: string): Promise<HelpCenterCategor
  * must use this — otherwise an admin marking a category private hides
  * it from the nav but not from a direct-slug lookup.
  */
-export async function getPublicCategoryBySlug(slug: string): Promise<HelpCenterCategory> {
+export async function getPublicCategoryBySlug(
+  slug: string,
+  locale?: string
+): Promise<HelpCenterCategory> {
   const category = await db.query.helpCenterCategories.findFirst({
     where: and(
       eq(helpCenterCategories.slug, slug),
@@ -212,7 +232,20 @@ export async function getPublicCategoryBySlug(slug: string): Promise<HelpCenterC
   if (!category) {
     throw new NotFoundError('CATEGORY_NOT_FOUND', `Category with slug "${slug}" not found`)
   }
-  return category
+  return localizedCategory(category, locale)
+}
+
+/** Trimmed names, and no entry for a language left blank. */
+function cleanTranslations(
+  translations: CreateCategoryInput['translations']
+): Record<string, { name: string; description: string | null }> {
+  const out: Record<string, { name: string; description: string | null }> = {}
+  for (const [locale, value] of Object.entries(translations ?? {})) {
+    const name = value?.name?.trim()
+    if (!name) continue
+    out[locale] = { name, description: value?.description?.trim() || null }
+  }
+  return out
 }
 
 // Fallback slug base for category names that romanize to nothing (see
@@ -257,6 +290,7 @@ export async function createCategory(input: CreateCategoryInput): Promise<HelpCe
       position: input.position ?? 0,
       parentId: (input.parentId as HelpCenterCategoryId) ?? null,
       icon: input.icon ?? null,
+      translations: cleanTranslations(input.translations),
     })
     .returning()
 
@@ -280,6 +314,8 @@ export async function updateCategory(
   if (input.isPublic !== undefined) updateData.isPublic = input.isPublic
   if (input.position !== undefined) updateData.position = input.position
   if (input.icon !== undefined) updateData.icon = input.icon ?? null
+  if (input.translations !== undefined)
+    updateData.translations = cleanTranslations(input.translations)
 
   if (input.parentId !== undefined) {
     const flat = await db.query.helpCenterCategories.findMany({

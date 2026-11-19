@@ -120,6 +120,11 @@ vi.mock('@/lib/server/db', () => ({
   inArray: vi.fn(),
 }))
 
+// The help center's languages: English only, as a board that never chose.
+vi.mock('@/lib/server/domains/settings/settings.service', () => ({
+  getHelpCenterConfig: vi.fn(async () => ({ locales: ['en'], defaultLocale: 'en' })),
+}))
+
 vi.mock('@/lib/server/markdown-tiptap', () => ({
   markdownToTiptapJson: vi.fn(() => ({ type: 'doc', content: [] })),
   contentJsonToMarkdown: (_json: unknown, fallback: string) => fallback,
@@ -397,6 +402,8 @@ describe('createArticle slug generation (#285)', () => {
   it('falls back to a generic slug for an emoji-only title', async () => {
     await createArticle({ categoryId: 'category_1', title: '🎉🎉', content: 'c' }, author)
     expect(insertedSlug()).toBe('article')
+    // No language given: the help center's default, and no translation group.
+    expect(insertValuesCalls[0][0]).toMatchObject({ locale: 'en', translationGroup: null })
   })
 
   it('appends a counter when the derived slug collides', async () => {
@@ -823,5 +830,32 @@ describe('restoreArticle', () => {
     await expect(restoreArticle('article_1' as HelpCenterArticleId)).rejects.toMatchObject({
       code: 'RESTORE_EXPIRED',
     })
+  })
+})
+
+describe('createArticle languages', () => {
+  beforeEach(() => {
+    // No slug collision: an earlier suite leaves this answering "taken".
+    mockArticleFindFirst.mockReset()
+    mockArticleFindFirst.mockResolvedValue(undefined)
+  })
+
+  it('refuses a language the help center does not offer', async () => {
+    mockPrincipalFindFirst.mockResolvedValueOnce({
+      id: 'principal_admin',
+      role: 'admin',
+      type: 'user',
+    })
+    const { db } = await import('@/lib/server/db')
+    vi.mocked(db.insert).mockClear()
+
+    await expect(
+      createArticle(
+        { categoryId: 'category_1', title: 'Tittel', content: 'Innhold', locale: 'nb' },
+        'principal_admin' as PrincipalId,
+        'principal_admin' as PrincipalId
+      )
+    ).rejects.toThrow(/not offered in "nb"/)
+    expect(db.insert).not.toHaveBeenCalled()
   })
 })

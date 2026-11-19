@@ -8,6 +8,7 @@ import {
   notFoundResponse,
   handleDomainError,
 } from '@/lib/server/domains/api/responses'
+import { categoryTranslationsSchema } from '@/lib/shared/schemas/help-center'
 import { parseTypeId } from '@/lib/server/domains/api/validation'
 import { isFeatureEnabled } from '@/lib/server/domains/settings/settings.service'
 import {
@@ -25,6 +26,8 @@ const updateCategoryBody = z.object({
   position: z.number().int().min(0).optional(),
   parentId: z.string().nullable().optional(),
   icon: z.string().max(50).nullable().optional(),
+  /** Name and description per language other than the default: {"nb": {"name": "..."}}. */
+  translations: categoryTranslationsSchema.optional(),
 })
 
 function formatCategory(cat: {
@@ -36,6 +39,7 @@ function formatCategory(cat: {
   parentId: string | null
   isPublic: boolean
   position: number
+  translations: Record<string, { name: string; description?: string | null }>
   createdAt: Date
   updatedAt: Date
 }) {
@@ -48,6 +52,7 @@ function formatCategory(cat: {
     parentId: cat.parentId,
     isPublic: cat.isPublic,
     position: cat.position,
+    translations: cat.translations,
     createdAt: cat.createdAt.toISOString(),
     updatedAt: cat.updatedAt.toISOString(),
   }
@@ -62,7 +67,11 @@ export const Route = createFileRoute('/api/v1/help-center/categories/$categoryId
         try {
           await withApiKeyAuth(request, { role: 'team' })
 
-          const categoryId = parseTypeId<HelpCenterCategoryId>(params.categoryId, 'category', 'category ID')
+          const categoryId = parseTypeId<HelpCenterCategoryId>(
+            params.categoryId,
+            'category',
+            'category ID'
+          )
 
           const category = await getCategoryById(categoryId)
           return successResponse(formatCategory(category))
@@ -77,7 +86,11 @@ export const Route = createFileRoute('/api/v1/help-center/categories/$categoryId
         try {
           await withApiKeyAuth(request, { role: 'admin' })
 
-          const categoryId = parseTypeId<HelpCenterCategoryId>(params.categoryId, 'category', 'category ID')
+          const categoryId = parseTypeId<HelpCenterCategoryId>(
+            params.categoryId,
+            'category',
+            'category ID'
+          )
 
           const body = await request.json()
           const parsed = updateCategoryBody.safeParse(body)
@@ -101,7 +114,11 @@ export const Route = createFileRoute('/api/v1/help-center/categories/$categoryId
         try {
           await withApiKeyAuth(request, { role: 'admin' })
 
-          const categoryId = parseTypeId<HelpCenterCategoryId>(params.categoryId, 'category', 'category ID')
+          const categoryId = parseTypeId<HelpCenterCategoryId>(
+            params.categoryId,
+            'category',
+            'category ID'
+          )
 
           await deleteCategory(categoryId)
           return noContentResponse()
