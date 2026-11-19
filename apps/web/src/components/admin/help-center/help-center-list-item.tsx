@@ -23,6 +23,8 @@ interface HelpCenterListItemProps {
   author: { id: string; name: string; avatarUrl: string | null } | null
   viewCount: number
   helpfulCount: number
+  /** The article's language, shown as a tag when given. */
+  locale?: string
   onEdit?: (id: HelpCenterArticleId) => void
   onDelete?: (id: HelpCenterArticleId) => void
 }
@@ -38,6 +40,7 @@ export function HelpCenterListItem({
   author,
   viewCount,
   helpfulCount,
+  locale,
   onEdit,
   onDelete,
 }: HelpCenterListItemProps) {
@@ -57,6 +60,14 @@ export function HelpCenterListItem({
         <div className="flex items-center gap-2 mb-1">
           <StatusBadge name={statusConfig.label} color={statusConfig.color} />
           <span className="text-[10px] text-muted-foreground/50 font-medium">{category.name}</span>
+          {locale && (
+            <span
+              className="rounded border border-border/60 px-1 text-[10px] font-medium uppercase text-muted-foreground"
+              title="Language"
+            >
+              {locale}
+            </span>
+          )}
         </div>
 
         <h3 className="font-semibold text-base text-foreground line-clamp-1">{title}</h3>

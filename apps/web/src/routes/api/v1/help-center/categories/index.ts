@@ -8,6 +8,7 @@ import {
   notFoundResponse,
   handleDomainError,
 } from '@/lib/server/domains/api/responses'
+import { categoryTranslationsSchema } from '@/lib/shared/schemas/help-center'
 import { isFeatureEnabled } from '@/lib/server/domains/settings/settings.service'
 import {
   listCategories,
@@ -22,6 +23,8 @@ const createCategoryBody = z.object({
   position: z.number().int().min(0).optional(),
   parentId: z.string().nullable().optional(),
   icon: z.string().max(50).nullable().optional(),
+  /** Name and description per language other than the default: {"nb": {"name": "..."}}. */
+  translations: categoryTranslationsSchema.optional(),
 })
 
 function formatCategory(cat: {
@@ -33,6 +36,7 @@ function formatCategory(cat: {
   parentId: string | null
   isPublic: boolean
   position: number
+  translations: Record<string, { name: string; description?: string | null }>
   createdAt: Date
   updatedAt: Date
 }) {
@@ -45,6 +49,7 @@ function formatCategory(cat: {
     parentId: cat.parentId,
     isPublic: cat.isPublic,
     position: cat.position,
+    translations: cat.translations,
     createdAt: cat.createdAt.toISOString(),
     updatedAt: cat.updatedAt.toISOString(),
   }

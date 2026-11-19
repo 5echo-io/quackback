@@ -28,6 +28,8 @@ import { FormError } from '@/components/shared/form-error'
 import { useImageUpload } from '@/lib/client/hooks/use-image-upload'
 import { useKeyboardSubmit } from '@/lib/client/hooks/use-keyboard-submit'
 import { updateArticleSchema } from '@/lib/shared/schemas/help-center'
+import { ArticleLanguageControls } from './article-language-controls'
+import type { SupportedLocale } from '@/lib/shared/i18n'
 import type { TiptapContent } from '@/lib/shared/schemas/posts'
 import {
   useUpdateArticle,
@@ -75,11 +77,15 @@ export function HelpCenterArticleEditor({ articleId }: HelpCenterArticleEditorPr
       description: '',
       content: '',
       categoryId: '',
+      locale: undefined as SupportedLocale | undefined,
+      translationGroup: null as string | null,
     },
   })
 
   const { isDirty } = form.formState
   const categoryId = form.watch('categoryId')
+  const locale = form.watch('locale')
+  const translationGroup = form.watch('translationGroup')
 
   useEffect(() => {
     if (article && !hasInitialized.current) {
@@ -90,6 +96,8 @@ export function HelpCenterArticleEditor({ articleId }: HelpCenterArticleEditorPr
         description: article.description ?? '',
         content: article.content,
         categoryId: article.categoryId,
+        locale: article.locale as SupportedLocale,
+        translationGroup: article.translationGroup ?? null,
       })
       setContentJson(getInitialContentJson(article))
     }
@@ -106,6 +114,20 @@ export function HelpCenterArticleEditor({ articleId }: HelpCenterArticleEditorPr
   const handleCategoryChange = useCallback(
     (id: string) => {
       form.setValue('categoryId', id, { shouldDirty: true })
+    },
+    [form]
+  )
+
+  const handleLocaleChange = useCallback(
+    (value: string) => {
+      form.setValue('locale', value as typeof locale, { shouldDirty: true })
+    },
+    [form]
+  )
+
+  const handleTranslationGroupChange = useCallback(
+    (value: string) => {
+      form.setValue('translationGroup', value || null, { shouldDirty: true })
     },
     [form]
   )
@@ -127,6 +149,8 @@ export function HelpCenterArticleEditor({ articleId }: HelpCenterArticleEditorPr
         content: data.content,
         contentJson: contentJson as TiptapContent | null,
         categoryId: data.categoryId,
+        locale: data.locale,
+        translationGroup: data.translationGroup?.trim() || null,
       },
       {
         onSuccess: () => {
@@ -136,6 +160,8 @@ export function HelpCenterArticleEditor({ articleId }: HelpCenterArticleEditorPr
             description: data.description?.trim() ?? '',
             content: data.content,
             categoryId: data.categoryId,
+            locale: data.locale,
+            translationGroup: data.translationGroup?.trim() || null,
           })
         },
       }
@@ -208,6 +234,14 @@ export function HelpCenterArticleEditor({ articleId }: HelpCenterArticleEditorPr
             </div>
 
             <div className="ml-auto flex items-center gap-1.5 shrink-0">
+              {locale && (
+                <ArticleLanguageControls
+                  locale={locale}
+                  onLocaleChange={handleLocaleChange}
+                  translationGroup={translationGroup ?? ''}
+                  onTranslationGroupChange={handleTranslationGroupChange}
+                />
+              )}
               <Select value={categoryId || undefined} onValueChange={handleCategoryChange}>
                 <SelectTrigger
                   size="sm"

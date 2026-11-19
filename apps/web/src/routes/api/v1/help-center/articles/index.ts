@@ -14,6 +14,7 @@ import { isFeatureEnabled } from '@/lib/server/domains/settings/settings.service
 import { listArticles, createArticle } from '@/lib/server/domains/help-center/help-center.service'
 import { contentJsonToMarkdown } from '@/lib/server/markdown-tiptap'
 import type { TiptapContent } from '@/lib/server/db'
+import { helpCenterLocaleSchema, translationGroupSchema } from '@/lib/shared/schemas/help-center'
 import type { PrincipalId } from '@quackback/ids'
 
 const createArticleBody = z.object({
@@ -23,11 +24,17 @@ const createArticleBody = z.object({
   slug: z.string().max(200).optional(),
   description: z.string().max(300).optional(),
   authorId: z.string().optional(),
+  /** The language the article is written in; the help center's default when left out. */
+  locale: helpCenterLocaleSchema.optional(),
+  /** Shared by an article and its translations, one per language. */
+  translationGroup: translationGroupSchema.nullable().optional(),
 })
 
 function formatArticle(article: {
   id: string
   slug: string
+  locale: string
+  translationGroup: string | null
   title: string
   description: string | null
   content: string
@@ -44,6 +51,8 @@ function formatArticle(article: {
   return {
     id: article.id,
     slug: article.slug,
+    locale: article.locale,
+    translationGroup: article.translationGroup,
     title: article.title,
     description: article.description,
     // Render markdown from the canonical contentJson so images survive; falls
@@ -75,8 +84,20 @@ export const Route = createFileRoute('/api/v1/help-center/articles/')({
           const categoryId = url.searchParams.get('categoryId') ?? undefined
           const status = (url.searchParams.get('status') as 'draft' | 'published' | 'all') ?? 'all'
           const search = url.searchParams.get('search') ?? undefined
+          const localeParam = url.searchParams.get('locale')
+          const locale = localeParam ? helpCenterLocaleSchema.safeParse(localeParam) : null
+          if (locale && !locale.success) {
+            return badRequestResponse('Unknown locale', { errors: { locale: [localeParam] } })
+          }
 
-          const result = await listArticles({ categoryId, status, search, cursor, limit })
+          const result = await listArticles({
+            categoryId,
+            status,
+            search,
+            cursor,
+            limit,
+            locale: locale?.data,
+          })
 
           return successResponse(result.items.map(formatArticle), {
             pagination: {

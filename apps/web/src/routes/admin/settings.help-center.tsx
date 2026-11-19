@@ -6,6 +6,7 @@ import { InlineSpinner } from '@/components/admin/settings/inline-spinner'
 import { BackLink } from '@/components/ui/back-link'
 import { PageHeader } from '@/components/shared/page-header'
 import { SettingsCard } from '@/components/admin/settings/settings-card'
+import { HelpCenterLanguageSettings } from '@/components/admin/settings/help-center-language-settings'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -152,6 +153,8 @@ function HelpCenterSettingsPage() {
           </div>
         </div>
       </SettingsCard>
+
+      <HelpCenterLanguageSettings config={config} disabled={isBusy} onSave={saveField} />
     </div>
   )
 }

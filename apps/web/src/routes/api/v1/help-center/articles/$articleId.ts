@@ -19,6 +19,7 @@ import {
 } from '@/lib/server/domains/help-center/help-center.service'
 import { contentJsonToMarkdown } from '@/lib/server/markdown-tiptap'
 import type { TiptapContent } from '@/lib/server/db'
+import { helpCenterLocaleSchema, translationGroupSchema } from '@/lib/shared/schemas/help-center'
 import type { HelpCenterArticleId, PrincipalId } from '@quackback/ids'
 
 const updateArticleBody = z.object({
@@ -29,11 +30,15 @@ const updateArticleBody = z.object({
   description: z.string().max(300).optional(),
   publishedAt: z.string().datetime().nullable().optional(),
   authorId: z.string().optional(),
+  locale: helpCenterLocaleSchema.optional(),
+  translationGroup: translationGroupSchema.nullable().optional(),
 })
 
 function formatArticle(article: {
   id: string
   slug: string
+  locale: string
+  translationGroup: string | null
   title: string
   description: string | null
   content: string
@@ -50,6 +55,8 @@ function formatArticle(article: {
   return {
     id: article.id,
     slug: article.slug,
+    locale: article.locale,
+    translationGroup: article.translationGroup,
     title: article.title,
     description: article.description,
     // Render markdown from the canonical contentJson so images survive; falls

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { useIntl } from 'react-intl'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ interface SearchResult {
 // ============================================================================
 
 export function HelpCenterHeroSearch() {
+  const intl = useIntl()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -101,7 +103,10 @@ export function HelpCenterHeroSearch() {
         <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Search articles..."
+          placeholder={intl.formatMessage({
+            id: 'portal.hc.search.placeholder',
+            defaultMessage: 'Search articles...',
+          })}
           value={query}
           onChange={handleChange}
           onFocus={() => results.length > 0 && setShowResults(true)}

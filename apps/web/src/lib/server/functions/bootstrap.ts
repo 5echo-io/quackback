@@ -1,6 +1,7 @@
 import { createServerFn, createServerOnlyFn } from '@tanstack/react-start'
 import { getThemeCookie, parsePrefersColorScheme, type Theme } from '@/lib/shared/theme'
-import { resolveLocale, type SupportedLocale } from '@/lib/shared/i18n'
+import { type SupportedLocale } from '@/lib/shared/i18n'
+import { visitorLocaleForRequest } from '@/lib/server/visitor-locale'
 import type { Session, PrincipalType } from '@/lib/server/auth/session'
 import type { TenantSettings } from '@/lib/server/domains/settings'
 import type { SessionId, UserId } from '@quackback/ids'
@@ -156,7 +157,9 @@ const getBootstrapDataInternal = createServerOnlyFn(async (): Promise<BootstrapD
 
   const headers = getRequestHeaders()
   const themeCookie = getThemeCookie(headers.get('cookie') ?? null)
-  const acceptLanguageLocale = resolveLocale(headers.get('accept-language'))
+  // Named for what it was first; it is the visitor's locale by the one rule
+  // (`?lang=`, then the locale cookie, then Accept-Language).
+  const acceptLanguageLocale = await visitorLocaleForRequest()
 
   // Advertise the prefers-color-scheme client hint so the browser tells us the
   // OS preference. Critical-CH makes Chromium retry the very first navigation

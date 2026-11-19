@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest'
 import {
   normalizeLocale,
   resolveLocale,
+  resolveVisitorLocale,
+  localeFromCookie,
   isRtlLocale,
+  LOCALE_AUTONYMS,
   SUPPORTED_LOCALES,
   DEFAULT_LOCALE,
 } from '../i18n'
@@ -132,5 +135,64 @@ describe('SUPPORTED_LOCALES', () => {
   })
   it('DEFAULT_LOCALE is en', () => {
     expect(DEFAULT_LOCALE).toBe('en')
+  })
+})
+
+describe('Nordic locales', () => {
+  it('reads every Norwegian tag as Bokmål', () => {
+    expect(normalizeLocale('nb')).toBe('nb')
+    expect(normalizeLocale('nb-NO')).toBe('nb')
+    expect(normalizeLocale('no')).toBe('nb')
+    expect(normalizeLocale('nn-NO')).toBe('nb')
+  })
+
+  it('knows Swedish and Danish', () => {
+    expect(normalizeLocale('sv-SE')).toBe('sv')
+    expect(normalizeLocale('da-DK')).toBe('da')
+  })
+
+  it('picks Norwegian from a Norwegian browser', () => {
+    expect(resolveLocale('nb-NO,nb;q=0.9,no;q=0.8,en;q=0.7')).toBe('nb')
+  })
+})
+
+describe('resolveVisitorLocale', () => {
+  it('lets ?lang= win over the cookie and the browser', () => {
+    expect(
+      resolveVisitorLocale({
+        explicit: 'sv',
+        cookieHeader: 'qb_locale=da',
+        acceptLanguage: 'nb-NO',
+      })
+    ).toBe('sv')
+  })
+
+  it('remembers the chosen language over the browser’s', () => {
+    expect(
+      resolveVisitorLocale({ cookieHeader: 'theme=dark; qb_locale=da', acceptLanguage: 'nb' })
+    ).toBe('da')
+  })
+
+  it('uses the browser when nothing was chosen, or the choice is unknown', () => {
+    expect(resolveVisitorLocale({ acceptLanguage: 'nb' })).toBe('nb')
+    expect(
+      resolveVisitorLocale({ explicit: 'xx', cookieHeader: 'qb_locale=yy', acceptLanguage: 'de' })
+    ).toBe('de')
+    expect(resolveVisitorLocale({})).toBe(DEFAULT_LOCALE)
+  })
+})
+
+describe('localeFromCookie', () => {
+  it('reads the locale cookie among others', () => {
+    expect(localeFromCookie('a=1; qb_locale=nb; b=2')).toBe('nb')
+    expect(localeFromCookie('a=1')).toBeNull()
+    expect(localeFromCookie(null)).toBeNull()
+  })
+})
+
+describe('LOCALE_AUTONYMS', () => {
+  it('names every supported locale in its own language', () => {
+    for (const locale of SUPPORTED_LOCALES) expect(LOCALE_AUTONYMS[locale]).toBeTruthy()
+    expect(LOCALE_AUTONYMS.nb).toBe('Norsk')
   })
 })

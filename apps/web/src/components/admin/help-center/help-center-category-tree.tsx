@@ -16,6 +16,7 @@ export interface TreeCategory {
   isPublic: boolean
   articleCount: number
   recursiveArticleCount: number
+  translations?: Record<string, { name: string; description?: string | null }>
 }
 
 /** Handlers for category CRUD, shared between the sidebar tree and the main finder. */

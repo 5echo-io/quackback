@@ -18,6 +18,8 @@ import {
   sql,
 } from '@/lib/server/db'
 import { generateKbEmbedding } from './help-center-embedding.service'
+import { articleSearchConfig, readableIn, type ReaderLocale } from './help-center.locale'
+import { localizedCategory } from '@/lib/shared/help-center-locale'
 
 const KEYWORD_WEIGHT = 0.4
 const SEMANTIC_WEIGHT = 0.6
@@ -31,6 +33,8 @@ export interface HybridSearchResult {
   categoryId: string
   categorySlug: string
   categoryName: string
+  /** The language the article is written in. */
+  locale: string
   score: number
 }
 
@@ -60,14 +64,30 @@ export function computeHybridScore(
  * 2. If embedding is available: runs a hybrid query combining tsvector + pgvector
  * 3. If embedding is unavailable: falls back to keyword-only search
  */
-export async function hybridSearch(query: string, limit = 10): Promise<HybridSearchResult[]> {
+export async function hybridSearch(
+  query: string,
+  limit = 10,
+  /** Search only what this reader is shown: their language, or the default's. */
+  reader?: ReaderLocale
+): Promise<HybridSearchResult[]> {
   const queryEmbedding = await generateKbEmbedding(query)
 
   if (queryEmbedding) {
-    return hybridQuery(query, queryEmbedding, limit)
+    return hybridQuery(query, queryEmbedding, limit, reader)
   }
 
-  return keywordOnlyQuery(query, limit)
+  return keywordOnlyQuery(query, limit, reader)
+}
+
+/** The category's name in the reader's language. */
+function categoryNameFor(
+  row: { categoryName: string; categoryTranslations: Record<string, { name: string }> | null },
+  reader?: ReaderLocale
+): string {
+  return localizedCategory(
+    { name: row.categoryName, description: null, translations: row.categoryTranslations },
+    reader?.locale
+  ).name
 }
 
 /**
@@ -76,10 +96,12 @@ export async function hybridSearch(query: string, limit = 10): Promise<HybridSea
 async function hybridQuery(
   query: string,
   embedding: number[],
-  limit: number
+  limit: number,
+  reader?: ReaderLocale
 ): Promise<HybridSearchResult[]> {
   const vectorStr = `[${embedding.join(',')}]`
-  const tsQuery = sql`websearch_to_tsquery('english', ${query})`
+  // Each article stems in its own language (help-center.locale).
+  const tsQuery = sql`websearch_to_tsquery(${articleSearchConfig()}, ${query})`
 
   const results = await db
     .select({
@@ -91,6 +113,8 @@ async function hybridQuery(
       categoryId: helpCenterArticles.categoryId,
       categorySlug: helpCenterCategories.slug,
       categoryName: helpCenterCategories.name,
+      categoryTranslations: helpCenterCategories.translations,
+      locale: helpCenterArticles.locale,
       combinedScore: sql<number>`(
         ${KEYWORD_WEIGHT} * COALESCE(ts_rank(${helpCenterArticles.searchVector}, ${tsQuery}), 0) +
         ${SEMANTIC_WEIGHT} * COALESCE(1 - (${helpCenterArticles.embedding} <=> ${vectorStr}::vector), 0)
@@ -113,6 +137,7 @@ async function hybridQuery(
         isNull(helpCenterArticles.deletedAt),
         isNull(helpCenterCategories.deletedAt),
         eq(helpCenterCategories.isPublic, true),
+        ...(reader ? [readableIn(reader)] : []),
         sql`(
           ${helpCenterArticles.searchVector} @@ ${tsQuery}
           OR (
@@ -133,7 +158,8 @@ async function hybridQuery(
     content: r.content,
     categoryId: r.categoryId,
     categorySlug: r.categorySlug,
-    categoryName: r.categoryName,
+    categoryName: categoryNameFor(r, reader),
+    locale: r.locale,
     score: Number(r.combinedScore),
   }))
 }
@@ -141,8 +167,12 @@ async function hybridQuery(
 /**
  * Keyword-only fallback when embedding generation is unavailable.
  */
-async function keywordOnlyQuery(query: string, limit: number): Promise<HybridSearchResult[]> {
-  const tsQuery = sql`websearch_to_tsquery('english', ${query})`
+async function keywordOnlyQuery(
+  query: string,
+  limit: number,
+  reader?: ReaderLocale
+): Promise<HybridSearchResult[]> {
+  const tsQuery = sql`websearch_to_tsquery(${articleSearchConfig()}, ${query})`
 
   const results = await db
     .select({
@@ -154,6 +184,8 @@ async function keywordOnlyQuery(query: string, limit: number): Promise<HybridSea
       categoryId: helpCenterArticles.categoryId,
       categorySlug: helpCenterCategories.slug,
       categoryName: helpCenterCategories.name,
+      categoryTranslations: helpCenterCategories.translations,
+      locale: helpCenterArticles.locale,
       score: sql<number>`ts_rank(${helpCenterArticles.searchVector}, ${tsQuery})`.as('score'),
     })
     .from(helpCenterArticles)
@@ -168,6 +200,7 @@ async function keywordOnlyQuery(query: string, limit: number): Promise<HybridSea
         isNull(helpCenterArticles.deletedAt),
         isNull(helpCenterCategories.deletedAt),
         eq(helpCenterCategories.isPublic, true),
+        ...(reader ? [readableIn(reader)] : []),
         sql`${helpCenterArticles.searchVector} @@ ${tsQuery}`
       )
     )
@@ -182,7 +215,8 @@ async function keywordOnlyQuery(query: string, limit: number): Promise<HybridSea
     content: r.content,
     categoryId: r.categoryId,
     categorySlug: r.categorySlug,
-    categoryName: r.categoryName,
+    categoryName: categoryNameFor(r, reader),
+    locale: r.locale,
     score: Number(r.score),
   }))
 }

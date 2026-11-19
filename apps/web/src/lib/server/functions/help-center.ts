@@ -27,7 +27,10 @@ import {
   deleteArticle,
   restoreArticle,
   recordArticleFeedback,
+  listPublishedTranslations,
 } from '@/lib/server/domains/help-center/help-center.service'
+import type { ReaderLocale } from '@/lib/server/domains/help-center/help-center.locale'
+import { contentLocaleFor, helpCenterLocales } from '@/lib/shared/help-center-locale'
 import {
   listCategoriesSchema,
   getCategorySchema,
@@ -82,6 +85,33 @@ function serializeCategory<T extends { createdAt: Date; updatedAt: Date; deleted
 }
 
 // ============================================================================
+// The reader's language
+// ============================================================================
+
+/**
+ * The language this request's reader reads the help center in, and the help
+ * center's languages: the visitor's locale (`?lang=`, cookie, browser) when the
+ * help center offers it, its default otherwise.
+ */
+async function helpCenterReader(): Promise<ReaderLocale & { locales: string[] }> {
+  const [{ visitorLocaleForRequest }, { getHelpCenterConfig }] = await Promise.all([
+    import('@/lib/server/visitor-locale'),
+    import('@/lib/server/domains/settings/settings.service'),
+  ])
+  const [visitor, config] = await Promise.all([visitorLocaleForRequest(), getHelpCenterConfig()])
+  const { locales, defaultLocale } = helpCenterLocales(config)
+  return { locale: contentLocaleFor(visitor, config), defaultLocale, locales }
+}
+
+/** The help center's languages and the one this reader reads in, for the switcher. */
+export const getHelpCenterLanguagesFn = createServerFn({ method: 'GET' })
+  .validator(z.object({}))
+  .handler(async () => {
+    const { locale, defaultLocale, locales } = await helpCenterReader()
+    return { locale, defaultLocale, locales }
+  })
+
+// ============================================================================
 // Category Server Functions
 // ============================================================================
 
@@ -96,7 +126,7 @@ export const listCategoriesFn = createServerFn({ method: 'GET' })
 export const listPublicCategoriesFn = createServerFn({ method: 'GET' })
   .validator(z.object({}))
   .handler(async () => {
-    const categories = await listPublicCategories()
+    const categories = await listPublicCategories(await helpCenterReader())
     return categories.map(serializeCategory)
   })
 
@@ -116,7 +146,8 @@ export const getPublicCategoryBySlugFn = createServerFn({ method: 'GET' })
     // help-center traffic.
     const { getPublicCategoryBySlug } =
       await import('@/lib/server/domains/help-center/help-center.category.service')
-    const category = await getPublicCategoryBySlug(data.slug)
+    const reader = await helpCenterReader()
+    const category = await getPublicCategoryBySlug(data.slug, reader.locale)
     return serializeCategory(category)
   })
 
@@ -192,7 +223,7 @@ export const restoreArticleFn = createServerFn({ method: 'POST' })
 export const listPublicArticlesFn = createServerFn({ method: 'GET' })
   .validator(listPublicArticlesSchema)
   .handler(async ({ data }) => {
-    const result = await listPublicArticles(data)
+    const result = await listPublicArticles({ ...data, reader: await helpCenterReader() })
     return {
       ...result,
       items: result.items.map(serializeArticle),
@@ -202,7 +233,7 @@ export const listPublicArticlesFn = createServerFn({ method: 'GET' })
 export const listPublicArticlesForCategoryFn = createServerFn({ method: 'GET' })
   .validator(z.object({ categoryId: z.string() }))
   .handler(async ({ data }) => {
-    const articles = await listPublicArticlesForCategory(data.categoryId)
+    const articles = await listPublicArticlesForCategory(data.categoryId, await helpCenterReader())
     return articles.map((a) => ({
       ...a,
       publishedAt: toIsoStringOrNull(a.publishedAt),
@@ -226,9 +257,19 @@ export const getArticleFn = createServerFn({ method: 'GET' })
 export const getPublicArticleBySlugFn = createServerFn({ method: 'GET' })
   .validator(getArticleBySlugSchema)
   .handler(async ({ data }) => {
-    const article = await getPublicArticleBySlug(data.slug)
+    const [article, reader] = await Promise.all([
+      getPublicArticleBySlug(data.slug),
+      helpCenterReader(),
+    ])
     const { helpfulCount: _h, notHelpfulCount: _n, ...publicArticle } = serializeArticle(article)
-    return publicArticle
+    // The article is shown in the language it is written in, whatever the
+    // reader's; the switcher offers its published translations.
+    const translations = await listPublishedTranslations(article.translationGroup)
+    return {
+      ...publicArticle,
+      translations,
+      helpCenterLocales: reader.locales,
+    }
   })
 
 export const createArticleFn = createServerFn({ method: 'POST' })
@@ -304,5 +345,5 @@ export const searchPublicArticlesFn = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const { hybridSearch } =
       await import('@/lib/server/domains/help-center/help-center-search.service')
-    return hybridSearch(data.query, data.limit ?? 10)
+    return hybridSearch(data.query, data.limit ?? 10, await helpCenterReader())
   })

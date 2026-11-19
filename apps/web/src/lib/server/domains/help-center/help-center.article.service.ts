@@ -12,7 +12,9 @@ import {
   sql,
 } from '@/lib/server/db'
 import type { HelpCenterArticleId, HelpCenterCategoryId, PrincipalId } from '@quackback/ids'
-import { NotFoundError, ValidationError } from '@/lib/shared/errors'
+import { ConflictError, NotFoundError, ValidationError } from '@/lib/shared/errors'
+import { helpCenterLocales, localizedCategory } from '@/lib/shared/help-center-locale'
+import { assertOfferedLocale, isTranslationConflict } from './help-center.locale'
 import { isTeamMember } from '@/lib/shared/roles'
 import { markdownToTiptapJson, contentJsonToMarkdown } from '@/lib/server/markdown-tiptap'
 import { rehostExternalImages } from '@/lib/server/content/rehost-images'
@@ -38,7 +40,7 @@ export async function resolveArticleWithCategory(
   const [category, authorRecord] = await Promise.all([
     db.query.helpCenterCategories.findFirst({
       where: eq(helpCenterCategories.id, article.categoryId),
-      columns: { id: true, slug: true, name: true },
+      columns: { id: true, slug: true, name: true, translations: true },
     }),
     article.principalId
       ? db.query.principal.findFirst({
@@ -50,8 +52,16 @@ export async function resolveArticleWithCategory(
 
   return {
     ...article,
+    // Named in the article's own language, as the rest of its page is.
     category: category
-      ? { id: category.id as HelpCenterCategoryId, slug: category.slug, name: category.name }
+      ? {
+          id: category.id as HelpCenterCategoryId,
+          slug: category.slug,
+          name: localizedCategory(
+            { name: category.name, description: null, translations: category.translations },
+            article.locale
+          ).name,
+        }
       : { id: article.categoryId as HelpCenterCategoryId, slug: '', name: 'Unknown' },
     author: authorRecord?.displayName
       ? {
@@ -120,6 +130,23 @@ export async function getPublicArticleBySlug(slug: string): Promise<HelpCenterAr
   return resolveArticleWithCategory(article)
 }
 
+/** The help center's languages, from its settings. */
+async function offeredLocales() {
+  const { getHelpCenterConfig } = await import('@/lib/server/domains/settings/settings.service')
+  return helpCenterLocales(await getHelpCenterConfig())
+}
+
+/** One translation per language in a group: say so instead of a 500. */
+function translationConflict(error: unknown): never {
+  if (isTranslationConflict(error)) {
+    throw new ConflictError(
+      'TRANSLATION_EXISTS',
+      'This translation group already has an article in that language'
+    )
+  }
+  throw error
+}
+
 // Fallback slug base for article titles that romanize to nothing (see
 // uniqueHelpCenterSlug). 'article', 'article-2', ...
 const FALLBACK_ARTICLE_SLUG = 'article'
@@ -177,10 +204,16 @@ export async function createArticle(
     principalId,
   })
 
+  const offered = await offeredLocales()
+  const locale = input.locale ?? offered.defaultLocale
+  assertOfferedLocale(locale, offered.locales)
+
   const [article] = await db
     .insert(helpCenterArticles)
     .values({
       categoryId: input.categoryId as HelpCenterCategoryId,
+      locale,
+      translationGroup: input.translationGroup ?? null,
       title,
       // Store the markdown projection of the canonical contentJson so the
       // article list endpoint (which omits contentJson) still serves images.
@@ -192,6 +225,7 @@ export async function createArticle(
       description: input.description?.trim() || null,
     })
     .returning()
+    .catch(translationConflict)
 
   const resolved = await resolveArticleWithCategory(article)
 
@@ -236,38 +270,45 @@ export async function updateArticle(
     )
   if (input.position !== undefined) updateData.position = input.position
   if (input.description !== undefined) updateData.description = input.description?.trim() || null
-  const updated = await db.transaction(async (tx) => {
-    if (authorPrincipalId !== undefined) {
-      const author = await tx.query.principal.findFirst({
-        where: eq(principal.id, authorPrincipalId),
-        columns: { id: true, role: true, type: true },
-      })
-      if (!author) throw new ValidationError('VALIDATION_ERROR', 'Author not found')
-      if (author.type !== 'user')
-        throw new ValidationError('VALIDATION_ERROR', 'Author must be a team member')
-      if (!isTeamMember(author.role)) {
-        // Allow re-asserting a former human team member who already owns the article.
-        // Both reads are inside the transaction so a concurrent author reassignment
-        // cannot slip between the role check and the ownership check.
-        const existing = await tx.query.helpCenterArticles.findFirst({
-          where: eq(helpCenterArticles.id, id),
-          columns: { principalId: true },
+  if (input.locale !== undefined) {
+    assertOfferedLocale(input.locale, (await offeredLocales()).locales)
+    updateData.locale = input.locale
+  }
+  if (input.translationGroup !== undefined) updateData.translationGroup = input.translationGroup
+  const updated = await db
+    .transaction(async (tx) => {
+      if (authorPrincipalId !== undefined) {
+        const author = await tx.query.principal.findFirst({
+          where: eq(principal.id, authorPrincipalId),
+          columns: { id: true, role: true, type: true },
         })
-        if (existing?.principalId !== authorPrincipalId) {
+        if (!author) throw new ValidationError('VALIDATION_ERROR', 'Author not found')
+        if (author.type !== 'user')
           throw new ValidationError('VALIDATION_ERROR', 'Author must be a team member')
+        if (!isTeamMember(author.role)) {
+          // Allow re-asserting a former human team member who already owns the article.
+          // Both reads are inside the transaction so a concurrent author reassignment
+          // cannot slip between the role check and the ownership check.
+          const existing = await tx.query.helpCenterArticles.findFirst({
+            where: eq(helpCenterArticles.id, id),
+            columns: { principalId: true },
+          })
+          if (existing?.principalId !== authorPrincipalId) {
+            throw new ValidationError('VALIDATION_ERROR', 'Author must be a team member')
+          }
         }
+        updateData.principalId = authorPrincipalId
       }
-      updateData.principalId = authorPrincipalId
-    }
 
-    const [row] = await tx
-      .update(helpCenterArticles)
-      .set(updateData)
-      .where(and(eq(helpCenterArticles.id, id), isNull(helpCenterArticles.deletedAt)))
-      .returning()
+      const [row] = await tx
+        .update(helpCenterArticles)
+        .set(updateData)
+        .where(and(eq(helpCenterArticles.id, id), isNull(helpCenterArticles.deletedAt)))
+        .returning()
 
-    return row
-  })
+      return row
+    })
+    .catch(translationConflict)
 
   if (!updated) throw new NotFoundError('ARTICLE_NOT_FOUND', `Article ${id} not found`)
 
