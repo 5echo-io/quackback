@@ -24,6 +24,10 @@ import { CategoryIcon, ICON_LOOKUP, ALL_ICON_KEYS } from '@/components/help-cent
 import { cn } from '@/lib/shared/utils'
 import { useCreateCategory, useUpdateCategory } from '@/lib/client/mutations/help-center'
 import { helpCenterQueries } from '@/lib/client/queries/help-center'
+import { settingsQueries } from '@/lib/client/queries/settings'
+import { helpCenterLocales } from '@/lib/shared/help-center-locale'
+import { LOCALE_AUTONYMS, type SupportedLocale } from '@/lib/shared/i18n'
+import type { HelpCenterConfig } from '@/lib/shared/types/settings'
 import {
   MAX_CATEGORY_DEPTH,
   collectDescendantIdsIncludingSelf,
@@ -52,6 +56,7 @@ interface CategoryFormDialogProps {
     icon: string | null
     isPublic: boolean
     parentId: HelpCenterCategoryId | null
+    translations?: Record<string, { name: string; description?: string | null }>
   }
   /** Pre-selected parent when creating a new category (ignored if initialValues is set). */
   defaultParentId?: HelpCenterCategoryId | null
@@ -74,7 +79,16 @@ export function CategoryFormDialog({
   const [description, setDescription] = useState('')
   const [isPublic, setIsPublic] = useState(true)
   const [parentId, setParentId] = useState<HelpCenterCategoryId | null>(null)
+  const [translatedNames, setTranslatedNames] = useState<Record<string, string>>({})
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
+  const { data: helpCenterConfig } = useQuery({
+    ...settingsQueries.helpCenterConfig(),
+    enabled: open,
+  })
+  const { locales, defaultLocale } = helpCenterLocales(
+    helpCenterConfig as HelpCenterConfig | undefined
+  )
+  const otherLocales = locales.filter((l) => l !== defaultLocale)
   const [iconSearch, setIconSearch] = useState('')
 
   useEffect(() => {
@@ -84,6 +98,11 @@ export function CategoryFormDialog({
       setDescription(initialValues?.description || '')
       setIsPublic(initialValues?.isPublic ?? true)
       setParentId(initialValues?.parentId ?? defaultParentId ?? null)
+      setTranslatedNames(
+        Object.fromEntries(
+          Object.entries(initialValues?.translations ?? {}).map(([l, t]) => [l, t.name])
+        )
+      )
     }
   }, [open, initialValues, defaultParentId])
 
@@ -131,6 +150,18 @@ export function CategoryFormDialog({
     const trimmedDesc = description.trim()
     if (!trimmedName) return
 
+    // A blank name drops that language; its description, when one was set
+    // through the API, is kept as it was.
+    const translations = Object.fromEntries(
+      Object.entries(translatedNames)
+        .map(([l, n]) => [l, n.trim()] as const)
+        .filter(([, n]) => n)
+        .map(([l, n]) => [
+          l,
+          { name: n, description: initialValues?.translations?.[l]?.description ?? null },
+        ])
+    )
+
     if (isEdit) {
       await updateCategory.mutateAsync({
         id: initialValues.id,
@@ -139,6 +170,7 @@ export function CategoryFormDialog({
         icon,
         isPublic,
         parentId,
+        translations,
       })
     } else {
       const result = await createCategory.mutateAsync({
@@ -147,6 +179,7 @@ export function CategoryFormDialog({
         icon,
         isPublic,
         parentId,
+        translations,
       })
       onCreated?.(result.id)
     }
@@ -270,6 +303,34 @@ export function CategoryFormDialog({
             </div>
             <Switch checked={isPublic} onCheckedChange={setIsPublic} />
           </div>
+
+          {otherLocales.length > 0 && (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Name in other languages</legend>
+              <p className="text-xs text-muted-foreground">
+                Readers in these languages see this name. Left blank, they see the one above.
+              </p>
+              {otherLocales.map((l) => (
+                <div key={l} className="flex items-center gap-2">
+                  <Label
+                    htmlFor={`category-name-${l}`}
+                    className="w-28 shrink-0 text-sm font-normal"
+                  >
+                    {LOCALE_AUTONYMS[l as SupportedLocale] ?? l}
+                  </Label>
+                  <Input
+                    id={`category-name-${l}`}
+                    lang={l}
+                    value={translatedNames[l] ?? ''}
+                    onChange={(e) =>
+                      setTranslatedNames((prev) => ({ ...prev, [l]: e.target.value }))
+                    }
+                    placeholder={name || undefined}
+                  />
+                </div>
+              ))}
+            </fieldset>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

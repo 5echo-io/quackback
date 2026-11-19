@@ -25,6 +25,9 @@ import { HelpCenterListItem } from './help-center-list-item'
 import { CreateArticleDialog } from './create-article-dialog'
 import type { CategoryActions } from './help-center-category-tree'
 import { helpCenterQueries } from '@/lib/client/queries/help-center'
+import { settingsQueries } from '@/lib/client/queries/settings'
+import { helpCenterLocales } from '@/lib/shared/help-center-locale'
+import type { HelpCenterConfig } from '@/lib/shared/types/settings'
 import { useRestoreCategory, useRestoreArticle } from '@/lib/client/mutations/help-center'
 import { buildAncestorChain } from '@/lib/shared/help-center-tree'
 import { useHelpCenterFilters } from './use-help-center-filters'
@@ -85,6 +88,10 @@ function LiveHelpCenterFinder({
   const [createArticleOpen, setCreateArticleOpen] = useState(false)
 
   const { data: allCategories = [] } = useQuery(helpCenterQueries.categories())
+  // Tag each article with its language once the help center has more than one.
+  const { data: helpCenterConfig } = useQuery(settingsQueries.helpCenterConfig())
+  const showLocales =
+    helpCenterLocales(helpCenterConfig as HelpCenterConfig | undefined).locales.length > 1
 
   const ancestorChain = useMemo(() => {
     if (!filters.category) return []
@@ -242,6 +249,7 @@ function LiveHelpCenterFinder({
                     author={article.author}
                     viewCount={article.viewCount}
                     helpfulCount={article.helpfulCount}
+                    locale={showLocales ? article.locale : undefined}
                     onEdit={onEditArticle}
                     onDelete={onDeleteArticle}
                   />
