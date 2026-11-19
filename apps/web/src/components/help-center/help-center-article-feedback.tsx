@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { FormattedMessage } from 'react-intl'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { recordArticleFeedbackFn } from '@/lib/server/functions/help-center'
 import type { HelpCenterArticleId } from '@quackback/ids'
 
@@ -34,17 +34,29 @@ export function HelpCenterArticleFeedback({
     }
   }
 
+  const intl = useIntl()
   const subtitle =
     feedback === null
-      ? 'Your feedback shapes what we write next.'
+      ? intl.formatMessage({
+          id: 'portal.hc.feedback.prompt',
+          defaultMessage: 'Your feedback shapes what we write next.',
+        })
       : feedback === 'helpful'
-        ? 'Thanks — glad it landed.'
-        : "Noted. We'll revisit this article."
+        ? intl.formatMessage({
+            id: 'portal.hc.feedback.thanks',
+            defaultMessage: 'Thanks — glad it landed.',
+          })
+        : intl.formatMessage({
+            id: 'portal.hc.feedback.noted',
+            defaultMessage: "Noted. We'll revisit this article.",
+          })
 
   return (
     <div className="mt-10 rounded-xl border border-border/50 bg-card px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
       <div>
-        <p className="text-sm font-semibold text-foreground">Was this helpful?</p>
+        <p className="text-sm font-semibold text-foreground">
+          <FormattedMessage id="portal.hc.feedback.question" defaultMessage="Was this helpful?" />
+        </p>
         <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -58,7 +70,7 @@ export function HelpCenterArticleFeedback({
               : 'bg-muted/60 border border-border/60 text-foreground hover:bg-muted'
           }`}
         >
-          👍 Yes
+          👍 <FormattedMessage id="portal.hc.feedback.yes" defaultMessage="Yes" />
         </button>
         <button
           type="button"
@@ -70,7 +82,7 @@ export function HelpCenterArticleFeedback({
               : 'bg-muted/60 border border-border/60 text-foreground hover:bg-muted'
           }`}
         >
-          👎 No
+          👎 <FormattedMessage id="portal.hc.feedback.no" defaultMessage="No" />
         </button>
       </div>
       {feedback === 'not-helpful' && supportHref && (

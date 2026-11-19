@@ -1,5 +1,7 @@
 import { createFileRoute, notFound, Outlet } from '@tanstack/react-router'
 import type { FeatureFlags, HelpCenterConfig } from '@/lib/shared/types/settings'
+import { getHelpCenterLanguagesFn } from '@/lib/server/functions/help-center'
+import { HelpCenterLanguageSwitcher } from '@/components/help-center/help-center-language-switcher'
 
 export const Route = createFileRoute('/_portal/hc')({
   beforeLoad: ({ context }) => {
@@ -14,7 +16,8 @@ export const Route = createFileRoute('/_portal/hc')({
   loader: async ({ context }) => {
     const { settings } = context
     const helpCenterConfig = (settings?.helpCenterConfig as HelpCenterConfig | null) ?? null
-    return { helpCenterConfig }
+    const languages = await getHelpCenterLanguagesFn({ data: {} })
+    return { helpCenterConfig, languages }
   },
   head: () => {
     return { meta: [] }
@@ -23,9 +26,15 @@ export const Route = createFileRoute('/_portal/hc')({
 })
 
 function HelpCenterLayoutRoute() {
+  const { languages } = Route.useLoaderData()
   return (
     <div className="flex flex-1 min-h-0">
       <div className="flex-1 min-w-0">
+        {languages.locales.length > 1 && (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 flex justify-end">
+            <HelpCenterLanguageSwitcher locales={languages.locales} current={languages.locale} />
+          </div>
+        )}
         <Outlet />
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { FormattedMessage } from 'react-intl'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
 import { Button } from '@/components/ui/button'
 import { HelpCenterHeroSearch } from '@/components/help-center/help-center-search'
@@ -9,6 +9,9 @@ import {
   listPublicCategoryEditorsFn,
 } from '@/lib/server/functions/help-center'
 import type { HelpCenterConfig } from '@/lib/shared/types/settings'
+
+const DEFAULT_TITLE = 'How can we help?'
+const DEFAULT_DESCRIPTION = 'Search our knowledge base or browse by category'
 
 export const Route = createFileRoute('/_portal/hc/')({
   loader: async ({ context }) => {
@@ -58,9 +61,21 @@ function HelpCenterLandingPage() {
   const supportEnabled =
     !!settings?.featureFlags?.supportInbox && !!settings?.portalConfig?.support?.enabled
 
-  const title = helpCenterConfig?.homepageTitle ?? 'How can we help?'
+  // The built-in title and description are translated; one the admin wrote
+  // is shown as written, in the one language it was written in.
+  const intl = useIntl()
+  const title =
+    !helpCenterConfig?.homepageTitle || helpCenterConfig.homepageTitle === DEFAULT_TITLE
+      ? intl.formatMessage({ id: 'portal.hc.home.title', defaultMessage: 'How can we help?' })
+      : helpCenterConfig.homepageTitle
   const description =
-    helpCenterConfig?.homepageDescription ?? 'Search our knowledge base or browse by category'
+    !helpCenterConfig?.homepageDescription ||
+    helpCenterConfig.homepageDescription === DEFAULT_DESCRIPTION
+      ? intl.formatMessage({
+          id: 'portal.hc.home.description',
+          defaultMessage: 'Search our knowledge base or browse by category',
+        })
+      : helpCenterConfig.homepageDescription
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">

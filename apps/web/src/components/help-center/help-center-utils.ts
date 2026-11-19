@@ -73,9 +73,13 @@ export function buildCategoryBreadcrumbs<T extends CategoryLikeWithSlug>(params:
   allCategories: T[]
   categoryId: string
   articleTitle?: string
+  /** The first crumb's label, in the reader's language. */
+  rootLabel?: string
 }): Array<{ label: string; href?: string }> {
   const chain = buildAncestorChain(params.allCategories, params.categoryId)
-  const items: Array<{ label: string; href?: string }> = [{ label: 'Help Center', href: '/hc' }]
+  const items: Array<{ label: string; href?: string }> = [
+    { label: params.rootLabel ?? 'Help Center', href: '/hc' },
+  ]
 
   if (chain.length === 0) {
     // Unknown id — return just Help Center. The article fallback is

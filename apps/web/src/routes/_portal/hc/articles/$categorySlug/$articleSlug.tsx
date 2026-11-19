@@ -1,7 +1,7 @@
 import { createFileRoute, getRouteApi, notFound, Link } from '@tanstack/react-router'
 import { ArrowLeft, FileText } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { formatDistanceToNow } from 'date-fns'
+import { FormattedDate, FormattedMessage, useIntl } from 'react-intl'
 import { getPublicArticleBySlugFn } from '@/lib/server/functions/help-center'
 import { RichTextContent, isRichTextContent } from '@/components/ui/rich-text-editor'
 import { EmbedHydration } from '@/components/shared/embed-hydration'
@@ -51,6 +51,13 @@ export const Route = createFileRoute('/_portal/hc/articles/$categorySlug/$articl
       ((portalMatch?.context as Record<string, unknown> | undefined)?.baseUrl as string) ?? ''
     const canonicalUrl = `${baseUrl}/hc/articles/${params.categorySlug}/${params.articleSlug}`
 
+    // Each published translation is an alternate of this page.
+    const alternates = (article.translations ?? []).map((t) => ({
+      rel: 'alternate',
+      hrefLang: t.locale,
+      href: `${baseUrl}/hc/articles/${t.categorySlug}/${t.slug}`,
+    }))
+
     return {
       meta: [
         { title: pageTitle },
@@ -64,7 +71,7 @@ export const Route = createFileRoute('/_portal/hc/articles/$categorySlug/$articl
         { name: 'twitter:title', content: pageTitle },
         ...(description ? [{ name: 'twitter:description', content: description }] : []),
       ],
-      links: [{ rel: 'canonical', href: canonicalUrl }],
+      links: [{ rel: 'canonical', href: canonicalUrl }, ...alternates],
     }
   },
   component: ArticleDetailPage,
@@ -79,7 +86,9 @@ function ArticleDetailPage() {
   const supportEnabled =
     !!settings?.featureFlags?.supportInbox && !!settings?.portalConfig?.support?.enabled
 
+  const intl = useIntl()
   const breadcrumbs = buildCategoryBreadcrumbs({
+    rootLabel: intl.formatMessage({ id: 'portal.header.nav.help', defaultMessage: 'Help Center' }),
     allCategories,
     categoryId: category.id,
     articleTitle: article.title,
@@ -166,7 +175,7 @@ function ArticleDetailPage() {
           )}
 
           {/* Center: article */}
-          <article className="min-w-0 max-w-2xl flex-1 py-10">
+          <article lang={article.locale} className="min-w-0 max-w-2xl flex-1 py-10">
             <HelpCenterBreadcrumbs items={breadcrumbs.slice(0, -1)} />
 
             <h1 className="mt-6 text-3xl sm:text-4xl font-bold leading-tight tracking-tight">
@@ -195,16 +204,32 @@ function ArticleDetailPage() {
                 <div className="flex flex-col gap-0.5">
                   {article.author && (
                     <span className="text-sm text-muted-foreground">
-                      Written By{' '}
-                      <span className="font-semibold text-foreground">{article.author.name}</span>
+                      <FormattedMessage
+                        id="portal.hc.article.writtenBy"
+                        defaultMessage="Written by <b>{name}</b>"
+                        values={{
+                          name: article.author.name,
+                          b: (chunks: React.ReactNode) => (
+                            <span className="font-semibold text-foreground">{chunks}</span>
+                          ),
+                        }}
+                      />
                     </span>
                   )}
                   {article.updatedAt && (
                     <span className="text-sm text-muted-foreground">
-                      Last updated{' '}
-                      <span className="font-semibold text-foreground">
-                        {formatDistanceToNow(new Date(article.updatedAt), { addSuffix: true })}
-                      </span>
+                      <FormattedMessage
+                        id="portal.hc.article.lastUpdated"
+                        defaultMessage="Last updated <b>{date}</b>"
+                        values={{
+                          date: (
+                            <FormattedDate value={new Date(article.updatedAt)} dateStyle="medium" />
+                          ),
+                          b: (chunks: React.ReactNode) => (
+                            <span className="font-semibold text-foreground">{chunks}</span>
+                          ),
+                        }}
+                      />
                     </span>
                   )}
                 </div>

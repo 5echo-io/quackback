@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { FormattedMessage } from 'react-intl'
 
 interface ArticleLink {
   slug: string
@@ -19,7 +20,7 @@ export function HelpCenterPrevNext({ categorySlug, prev, next }: HelpCenterPrevN
       {prev ? (
         <Link to={`/hc/articles/${categorySlug}/${prev.slug}` as '/hc'} className="group text-left">
           <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-            &larr; Previous
+            &larr; <FormattedMessage id="portal.hc.prevNext.previous" defaultMessage="Previous" />
           </span>
           <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors mt-0.5">
             {prev.title}
@@ -34,7 +35,7 @@ export function HelpCenterPrevNext({ categorySlug, prev, next }: HelpCenterPrevN
           className="group text-right"
         >
           <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-            Next &rarr;
+            <FormattedMessage id="portal.hc.prevNext.next" defaultMessage="Next" /> &rarr;
           </span>
           <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors mt-0.5">
             {next.title}

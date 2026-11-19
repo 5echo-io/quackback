@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { FormattedMessage } from 'react-intl'
 import { getTopLevelCategories } from './help-center-utils'
 import { CategoryIcon } from './category-icon'
 
@@ -84,7 +85,11 @@ export function HelpCenterCategoryGrid({ categories, editors = {} }: HelpCenterC
             <div className="flex items-center gap-2.5 mt-1">
               <EditorAvatars editors={catEditors} />
               <span className="text-xs text-muted-foreground/60">
-                {cat.articleCount} {cat.articleCount === 1 ? 'article' : 'articles'}
+                <FormattedMessage
+                  id="portal.hc.category.articleCount"
+                  defaultMessage="{count, plural, one {# article} other {# articles}}"
+                  values={{ count: cat.articleCount }}
+                />
               </span>
             </div>
           </Link>

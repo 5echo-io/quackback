@@ -6,6 +6,7 @@ import {
   ArrowLeftIcon,
 } from '@heroicons/react/24/outline'
 import { useMemo } from 'react'
+import { FormattedMessage, useIntl } from 'react-intl'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { HelpCenterBreadcrumbs } from '@/components/help-center/help-center-breadcrumbs'
 import {
@@ -92,7 +93,11 @@ function ArticleRow({
       </div>
       {readingTimeMinutes != null && (
         <span className="text-xs text-muted-foreground/50 shrink-0 tabular-nums mt-0.5">
-          {readingTimeMinutes} min read
+          <FormattedMessage
+            id="portal.hc.category.readingTime"
+            defaultMessage="{minutes} min read"
+            values={{ minutes: readingTimeMinutes }}
+          />
         </span>
       )}
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-primary transition-colors mt-0.5" />
@@ -106,7 +111,9 @@ function CategoryIndexPage() {
   const { helpCenterConfig } = helpCenterApi.useLoaderData()
   const { baseUrl } = Route.useRouteContext()
 
+  const intl = useIntl()
   const breadcrumbs = buildCategoryBreadcrumbs({
+    rootLabel: intl.formatMessage({ id: 'portal.header.nav.help', defaultMessage: 'Help Center' }),
     allCategories,
     categoryId: category.id,
   })
@@ -164,10 +171,15 @@ function CategoryIndexPage() {
                 className="mb-4 shrink-0 inline-flex w-full items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <ArrowLeftIcon className="h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0 truncate">All categories</span>
+                <span className="min-w-0 truncate">
+                  <FormattedMessage
+                    id="portal.hc.category.allCategories"
+                    defaultMessage="All categories"
+                  />
+                </span>
               </Link>
               <p className="mb-1.5 shrink-0 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-                Browse
+                <FormattedMessage id="portal.hc.category.browse" defaultMessage="Browse" />
               </p>
               <ScrollArea className="min-h-0 flex-1" scrollBarClassName="w-1.5">
                 <ul className="w-full space-y-px pr-1">
@@ -242,16 +254,39 @@ function CategoryIndexPage() {
                     ))}
                   </div>
                   <span>
-                    By <span className="font-semibold text-foreground">{editors[0].name}</span>
-                    {editors.length > 1 && (
-                      <>
-                        {' '}
-                        and {editors.length - 1} other{editors.length > 2 ? 's' : ''}
-                      </>
+                    {editors.length > 1 ? (
+                      <FormattedMessage
+                        id="portal.hc.category.byEditors"
+                        defaultMessage="By <b>{name}</b> and {others, plural, one {# other} other {# others}}"
+                        values={{
+                          name: editors[0].name,
+                          others: editors.length - 1,
+                          b: (chunks: React.ReactNode) => (
+                            <span className="font-semibold text-foreground">{chunks}</span>
+                          ),
+                        }}
+                      />
+                    ) : (
+                      <FormattedMessage
+                        id="portal.hc.category.byEditor"
+                        defaultMessage="By <b>{name}</b>"
+                        values={{
+                          name: editors[0].name,
+                          b: (chunks: React.ReactNode) => (
+                            <span className="font-semibold text-foreground">{chunks}</span>
+                          ),
+                        }}
+                      />
                     )}
                   </span>
                   <span className="text-muted-foreground/40">·</span>
-                  <span>{totalArticles} articles</span>
+                  <span>
+                    <FormattedMessage
+                      id="portal.hc.category.articleCount"
+                      defaultMessage="{count, plural, one {# article} other {# articles}}"
+                      values={{ count: totalArticles }}
+                    />
+                  </span>
                 </div>
               )}
             </div>
@@ -285,13 +320,20 @@ function CategoryIndexPage() {
                                 to={`/hc/categories/${sub.slug}` as '/hc'}
                                 className="flex items-center justify-center px-5 py-3 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
                               >
-                                View all {sub.articles.length} articles
+                                <FormattedMessage
+                                  id="portal.hc.category.viewAll"
+                                  defaultMessage="View all {count} articles"
+                                  values={{ count: sub.articles.length }}
+                                />
                               </Link>
                             )}
                           </>
                         ) : (
                           <p className="px-5 py-3.5 text-sm text-muted-foreground">
-                            No articles yet.
+                            <FormattedMessage
+                              id="portal.hc.category.empty"
+                              defaultMessage="No articles yet."
+                            />
                           </p>
                         )}
                       </div>
